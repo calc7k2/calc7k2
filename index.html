@@ -252,6 +252,12 @@ td:first-child { width: 58%; }
 .mactions.skills .btn { min-height: 40px; padding: 6px 8px; font-size: 13.5px; border-radius: 12px; line-height: 1.15; }
 .mactions.skills .btn:not(.ghost) { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 
+.skcell { display: flex; gap: 4px; min-width: 0; }
+.skcell > .btn:first-child { flex: 1; min-width: 0; }
+.skcell .skminus { flex: none; min-width: 44px; padding: 0; font-size: 22px; font-weight: 700; background: var(--bad-soft); border-color: var(--bad); color: var(--bad); }
+.mactions.skills .skcell .skminus { min-height: 40px; font-size: 22px; padding: 0; }
+.mactions.skills .skcell .btn.skminus { background: var(--bad-soft); border-color: var(--bad); color: var(--bad); }
+
 </style></head><body>
 <header class="top"><div class="brand">Sorare <span>Snatch</span> Calculator</div><div id="status" class="status" role="status"></div></header>
 <main id="view"></main>
@@ -1177,7 +1183,7 @@ td:first-child { width: 58%; }
   /* ----- Mode serveur (application hors de Claude) : base et lecture d'images passent par le serveur ----- */
   var SERVER = !!window.SNATCH_SERVER;
   /* Mode « local » : tout reste sur l'appareil (base IndexedDB), lecture des images par OCR gratuit sur l'appareil. Aucun serveur, aucune API payante. */
-  var BUILD = '03/10 16:42';
+  var BUILD = '03/10 16:55';
   var LOCAL = !!window.SNATCH_LOCAL;
 
   function makeLocalShims() {
@@ -2181,10 +2187,13 @@ td:first-child { width: 58%; }
         return esc(kk ? kk.name : (SK_NAME[x.key] || x.key)) + (x.count > 1 ? ' x' + x.count : '') + (kk ? '' : ' (sans effet DEF/ATK)') + (x.sure ? '' : ' (chiffre à vérifier)');
       }).join(', ') + '.</p>';
     }
-    h += '<div class="lbl">Compétences · touchez pour ajouter, encore pour x2, x3…</div><div class="mactions skills">' + C.SKILLS.map(function (k) {
+    var anySk = C.SKILLS.some(function (k) { return m.skills && m.skills[k.key] > 0; });
+    h += '<div class="lbl">Compétences · touchez pour ajouter (encore pour x2, x3…), − pour retirer</div><div class="mactions skills">' + C.SKILLS.map(function (k) {
       var n = (m.skills && m.skills[k.key]) || 0;
-      return '<button class="btn small' + (n ? '' : ' ghost') + '" data-act="skill" data-key="' + m.key + '" data-sk="' + k.key + '">' + k.name + ' ' + (k.atk ? (k.atk > 0 ? '+' : '') + k.atk + ' ATK ' : '') + (k.def ? (k.def > 0 ? '+' : '') + k.def + ' DEF' : '') + (n ? ' · x' + n : '') + '</button>';
+      return '<div class="skcell"><button class="btn small' + (n ? '' : ' ghost') + '" data-act="skill" data-key="' + m.key + '" data-sk="' + k.key + '">' + k.name + ' ' + (k.atk ? (k.atk > 0 ? '+' : '') + k.atk + ' ATK ' : '') + (k.def ? (k.def > 0 ? '+' : '') + k.def + ' DEF' : '') + (n ? ' · x' + n : '') + '</button>' +
+        (n ? '<button class="btn small skminus" data-act="skill-minus" data-key="' + m.key + '" data-sk="' + k.key + '" aria-label="Retirer une ' + esc(k.name) + '">−</button>' : '') + '</div>';
     }).join('') + '</div>';
+    if (anySk) h += '<button class="btn small ghost danger" data-act="skill-clear" data-key="' + m.key + '">Retirer toutes les compétences</button>';
     var rp = C.roleStat(pos);
     if (rp) h += '<label class="check"><input type="checkbox" data-field="main" data-key="' + m.key + '"' + (S.mainsOff[m.key] ? '' : ' checked') + '><span>Peut être le joueur principal en ' + (rp === 'def' ? 'défense' : 'attaque') + '</span></label>';
     else h += '<p class="note small">' + (pos ? 'Jamais joueur principal (' + esc(pos) + ') : sa note compte à 25 %.' : 'Poste inconnu : indiquez-le pour savoir s\'il peut être joueur principal.') + '</p>';
@@ -2544,7 +2553,11 @@ td:first-child { width: 58%; }
       case 'toggle-seen':
         m = memberByKey(d.key); if (m) { m.useSeen = m.useSeen || {}; m.useSeen[d.stat] = !m.useSeen[d.stat]; } renderTab(); break;
       case 'skill':
-        m = memberByKey(d.key); if (m) { m.skills = m.skills || {}; var nn = (m.skills[d.sk] || 0) + 1; m.skills[d.sk] = nn > 5 ? 0 : nn; } renderTab(); break;
+        m = memberByKey(d.key); if (m) { m.skills = m.skills || {}; var nn = (m.skills[d.sk] || 0) + 1; m.skills[d.sk] = Math.min(9, nn); } renderTab(); break;
+      case 'skill-minus':
+        m = memberByKey(d.key); if (m && m.skills) { m.skills[d.sk] = Math.max(0, (m.skills[d.sk] || 0) - 1); } renderTab(); break;
+      case 'skill-clear':
+        m = memberByKey(d.key); if (m) { m.skills = {}; } renderTab(); break;
       case 'pick-do':
         if (S.modal && S.modal.type === 'pick') {
           if (S.modal.target === 'add') {
