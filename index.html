@@ -1336,7 +1336,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   /* ----- Mode serveur (application hors de Claude) : base et lecture d'images passent par le serveur ----- */
   var SERVER = !!window.SNATCH_SERVER;
   /* Mode « local » : tout reste sur l'appareil (base IndexedDB), lecture des images par OCR gratuit sur l'appareil. Aucun serveur, aucune API payante. */
-  var BUILD = '03/10 22:22';
+  var BUILD = '03/10 22:41';
   var LOCAL = !!window.SNATCH_LOCAL;
 
   function makeLocalShims() {
@@ -2150,11 +2150,13 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     return cv;
   }
 
-  function analyseScreenshotLocal(file) {
+  function analyseScreenshotLocal(file, mine) {
     var ctl = { cancelled: false }, notes = [];
-    if (S.team.img && S.team.img.url) { try { URL.revokeObjectURL(S.team.img.url); } catch (e) { /* ignore */ } }
-    S.team = { state: 'reading', members: [], err: '', img: { url: URL.createObjectURL(file), name: file.name, file: file }, ctl: { abort: function () { ctl.cancelled = true; } }, progress: 'Préparation de la lecture…' };
-    S.mainsOff = {};
+    var prev = mine ? (OPP ? S.team : S.mine.team) : S.team;
+    if (prev && prev.img && prev.img.url) { try { URL.revokeObjectURL(prev.img.url); } catch (e) { /* ignore */ } }
+    var T = { state: 'reading', members: [], err: '', img: { url: URL.createObjectURL(file), name: file.name, file: file }, ctl: { abort: function () { ctl.cancelled = true; } }, progress: 'Préparation de la lecture…' };
+    if (mine) { if (OPP) { S.team = T; S.mainsOff = {}; } else { S.mine.team = T; S.mine.mainsOff = {}; } }
+    else { S.team = T; S.mainsOff = {}; }
     renderTab();
     var stop = function () { if (ctl.cancelled) throw { code: 'cancelled' }; };
     return bitmapCanvas(file, 3200).then(function (cv) {
@@ -2162,12 +2164,12 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
       if (!found.cards.length) throw { code: 'x', message: 'Je ne reconnais pas cette mise en page (cartes du Lineup Snatch avec leur bandeau de prix). Ajoutez les joueurs à la main avec « Ajouter un joueur ».' };
       var grid = completeGrid(found), cells = grid.cards;
       cells.sort(function (a, b) { return a.row - b.row || a.x0 - b.x0; });
-      S.team.progress = 'Chargement du moteur de lecture (première fois seulement)…'; renderTab();
+      T.progress = 'Chargement du moteur de lecture (première fois seulement)…'; renderTab();
       var rows = [], srcs = [], sks = [], fds = [], skipped = 0, seq = Promise.resolve();
       cells.forEach(function (card, i) {
         seq = seq.then(function () {
           stop();
-          S.team.progress = 'Lecture de la carte ' + (i + 1) + ' sur ' + cells.length + '…'; renderTab();
+          T.progress = 'Lecture de la carte ' + (i + 1) + ' sur ' + cells.length + '…'; renderTab();
           var variants = [], modes = ['dark', 'otsu', 'gray', 'dark70', 'dark120', 'dark110'], m = null, chain = Promise.resolve();
           modes.forEach(function (mode) {
             chain = chain.then(function () {
@@ -2198,44 +2200,44 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
         });
       });
       return seq.then(function () {
-        S.team.srcs = srcs; S.team.sks = sks; S.team.fds = fds; S.team.nCells = cells.length;
+        T.srcs = srcs; T.sks = sks; T.fds = fds; T.nCells = cells.length;
         if (grid.guessed) notes.push('La dernière ligne est partiellement cachée par le bandeau du bas : vérifiez qu\'il ne manque aucun joueur (bouton « Ajouter un joueur »).');
         return rows;
       });
     }).then(function (rows) {
       var rr = C.normalizeAiRows(rows, null);
       if (!rr.length) throw { code: 'x', message: 'Aucun nom lisible sur cette capture. Vérifiez que votre base contient des joueurs (onglet Importer), ou ajoutez-les à la main.' };
-      S.team.members = C.matchTeam(S.db.players, rr);
-      S.team.members.forEach(function (m, i) { if (S.team.srcs && S.team.srcs[i]) m.posSrc = S.team.srcs[i]; });
+      T.members = C.matchTeam(S.db.players, rr);
+      T.members.forEach(function (m, i) { if (T.srcs && T.srcs[i]) m.posSrc = T.srcs[i]; });
       var fondRead = 0;
-      S.team.members.forEach(function (m, i) {
-        var fd = S.team.fds && S.team.fds[i];
+      T.members.forEach(function (m, i) {
+        var fd = T.fds && T.fds[i];
         if (fd && fd.p >= 0.45) { m.fond = fd.key; m.fondAuto = true; fondRead++; }
       });
       if (fondRead) notes.push('Le fond de chaque carte (chance de critique) est lu automatiquement sur ' + plural(fondRead, 'carte', 'cartes') + ' : vérifiez-le, vous pouvez le corriger sur chaque carte.');
       var skUnsure = 0;
-      S.team.members.forEach(function (m, i) {
-        var sk = (S.team.sks && S.team.sks[i]) || [];
+      T.members.forEach(function (m, i) {
+        var sk = (T.sks && T.sks[i]) || [];
         m.skillsRead = sk;
         m.skills = {};
         sk.forEach(function (x) { if (C.SKILLS.some(function (k) { return k.key === x.key; })) m.skills[x.key] = (m.skills[x.key] || 0) + x.count; if (!x.sure) skUnsure++; });
       });
       if (skUnsure) notes.push('Le chiffre (x2, x3…) de ' + plural(skUnsure, 'compétence', 'compétences') + ' n\'a pas pu être lu : x1 appliqué, vérifiez-le sur la carte.');
       // étiquette illisible et équipe de 7 : l'ordre des cartes est gardien, 2 défenseurs, 2 milieux, 2 attaquants
-      if (S.team.members.length === 7) {
+      if (T.members.length === 7) {
         var inferred = 0;
-        S.team.members.forEach(function (m, i) {
+        T.members.forEach(function (m, i) {
           var p = m.id ? S.db.players[m.id] : null;
           if (!(p && p.pos) && !m.pos) { m.pos = SLOT_ORDER[i]; m.posSrc = 'ordre'; inferred++; }
         });
         if (inferred) notes.push('Poste non lu sur ' + plural(inferred, 'carte', 'cartes') + ' : déduit de l\'ordre habituel (gardien, 2 défenseurs, 2 milieux, 2 attaquants). Vérifiez-le.');
       }
-      S.team.state = 'done'; S.team.notes = notes;
-      if (!Object.keys(S.db.players).length) S.team.err = 'Votre base est vide : importez d\'abord vos fichiers pour que les noms soient reconnus.';
+      T.state = 'done'; T.notes = notes;
+      if (!Object.keys(S.db.players).length) T.err = 'Votre base est vide : importez d\'abord vos fichiers pour que les noms soient reconnus.';
     }).catch(function (e) {
-      if (e && e.code === 'cancelled') { S.team.state = 'idle'; S.team.err = 'Lecture arrêtée.'; }
-      else { S.team.state = 'error'; S.team.err = e && e.code && e.code !== 'x' ? aiErrorText(e) : (e && e.message) || 'Lecture impossible.'; }
-    }).then(function () { S.team.ctl = null; S.team.progress = ''; renderTab(); });
+      if (e && e.code === 'cancelled') { T.state = 'idle'; T.err = 'Lecture arrêtée.'; }
+      else { T.state = 'error'; T.err = e && e.code && e.code !== 'x' ? aiErrorText(e) : (e && e.message) || 'Lecture impossible.'; }
+    }).then(function () { T.ctl = null; T.progress = ''; if (mine) saveMine(); renderTab(); });
   }
 
   function ocrImageToText(file, job) {
@@ -2251,8 +2253,8 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     });
   }
 
-  function analyseScreenshot(file, refresh) {
-    if (LOCAL) { return analyseScreenshotLocal(file); }
+  function analyseScreenshot(file, refresh, mine) {
+    if (LOCAL) { return analyseScreenshotLocal(file, mine); }
     if (!imagesOK()) {
       S.team = { state: 'error', members: [], err: noImagesMsg() + ' Vous pouvez aussi ajouter les joueurs à la main avec « Ajouter un joueur ».', img: null, ctl: null };
       renderTab(); return;
@@ -2660,9 +2662,16 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     h += '<div data-ctx="mine"><h2 class="sec">Mon équipe</h2>';
     h += inMine(function () {
       var t = S.team, x = '';
-      x += '<p class="muted small">Ajoutez vos joueurs depuis votre base. Votre équipe est gardée en mémoire sur cet appareil et incluse dans la sauvegarde.</p>';
+      x += '<p class="muted small">Envoyez une capture de votre équipe, ou ajoutez vos joueurs depuis votre base. Votre équipe est gardée en mémoire sur cet appareil et incluse dans la sauvegarde.</p>';
+      if (LOCAL) {
+        x += '<label class="btn primary big" for="mine-shot-input">' + ICONS.analyse + '<span>Envoyer la capture de mon équipe</span></label><input id="mine-shot-input" type="file" accept="image/*" hidden>';
+        if (t.state === 'reading') x += '<section class="card busy"><div class="spin" aria-hidden="true"></div><div><b>Lecture de la capture…</b><p class="muted">' + esc(t.progress || 'Cela prend en général 10 à 60 secondes.') + '</p></div><button class="btn ghost" data-act="stop-shot">Arrêter</button></section>';
+        (t.notes || []).forEach(function (n) { x += '<p class="note warn">' + esc(n) + '</p>'; });
+        if (t.err) x += '<section class="card alert bad"><p>' + esc(t.err) + '</p></section>';
+        if (t.img && t.state !== 'idle') x += '<details class="card shot"><summary>Voir la capture envoyée</summary><img src="' + esc(t.img.url) + '" alt="Capture envoyée"></details>';
+      }
       if (t.members.length) x += '<div class="members">' + t.members.map(renderMember).join('') + '</div>';
-      x += '<div class="row gap"><button class="btn" data-act="add-member">+ Ajouter un joueur</button>' + (t.members.length && !S.confirmMine ? '<button class="btn ghost danger" data-act="mine-clear">Vider mon équipe</button>' : '') + '</div>';
+      x += '<div class="row gap"><button class="btn" data-act="add-member">+ Ajouter un joueur</button>' + (t.img && t.state === 'done' && LOCAL ? '<button class="btn ghost" data-act="rerun-shot">Relire la capture</button>' : '') + (t.members.length && !S.confirmMine ? '<button class="btn ghost danger" data-act="mine-clear">Vider mon équipe</button>' : '') + '</div>';
       if (t.members.length && S.confirmMine) x += '<p class="note bad">Retirer tous les joueurs de votre équipe ?</p><div class="row gap"><button class="btn danger" data-act="mine-clear-do">Oui, vider</button><button class="btn ghost" data-act="mine-clear-no">Non</button></div>';
       if (t.members.length) {
         x += renderBonusPanel();
@@ -2965,7 +2974,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     var act = el.getAttribute('data-act'), d = el.dataset, m, job;
     switch (act) {
       case 'stop-shot': if (S.team.ctl) S.team.ctl.abort(); break;
-      case 'rerun-shot': if (S.team.img && S.team.img.file) analyseScreenshot(S.team.img.file, true); break;
+      case 'rerun-shot': if (S.team.img && S.team.img.file) analyseScreenshot(S.team.img.file, true, !!OPP); break;
       case 'add-member':
         S.modal = { type: 'pick', title: 'Ajouter un joueur', q: '', target: 'add' }; renderModal(); break;
       case 'change-member':
@@ -2991,7 +3000,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
       case 'mine-clear-no':
         S.confirmMine = false; renderTab(); break;
       case 'mine-clear-do':
-        S.team.members = []; S.mainsOff = {}; S.confirmMine = false; renderTab(); break;
+        S.team = { state: 'idle', members: [], err: '', img: null, ctl: null }; S.mainsOff = {}; S.confirmMine = false; renderTab(); break;
       case 'opp-clear':
         S.confirmOpp = true; renderTab(); break;
       case 'opp-clear-no':
@@ -3119,6 +3128,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   function onChange(ev) {
     var el = ev.target;
     if (el.id === 'shot-input' && el.files && el.files[0]) { analyseScreenshot(el.files[0], false); el.value = ''; }
+    else if (el.id === 'mine-shot-input' && el.files && el.files[0]) { analyseScreenshot(el.files[0], false, true); el.value = ''; }
     else if (el.id === 'file-input' && el.files && el.files.length) { startImport(Array.prototype.slice.call(el.files)); el.value = ''; }
     else if (el.id === 'backup-input' && el.files && el.files[0]) { restoreBackup(el.files[0]); el.value = ''; }
     else if (el.getAttribute('data-field') === 'main' && isMineEl(el)) {
