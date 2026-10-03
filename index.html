@@ -992,8 +992,14 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     var vts = (variants || []).map(function (v) {
       return tokens(String(v || '').replace(/[^A-Za-z\u00C0-\u024F]+/g, ' ')).filter(function (t) { return t.length >= 2; });
     }).filter(function (t) { return t.length; });
+    /* meilleure lecture : celle qui ressemble le plus à un nom (mots de 3 lettres ou plus), les débris d'un seul ou deux caractères la pénalisent */
+    function nameScore(t) {
+      var ws = t.split(/\s+/).filter(Boolean), sc = 0;
+      ws.forEach(function (w) { var l = w.replace(/[^A-Za-z\u00C0-\u024F]/g, '').length; if (l >= 3 && l === w.replace(/['-]/g, '').length) sc += l; else if (l >= 3) sc += l * 0.5; else sc -= 2; });
+      return sc;
+    }
     var raw = (variants || []).map(function (v) { return String(v || '').replace(/[^A-Za-z\u00C0-\u024F' -]+/g, ' ').replace(/\s+/g, ' ').trim(); })
-      .filter(function (t) { return t.replace(/[^A-Za-z]/g, '').length >= 3; }).sort(function (a, b) { return b.length - a.length; })[0] || '';
+      .filter(function (t) { return t.replace(/[^A-Za-z]/g, '').length >= 3; }).sort(function (a, b) { return nameScore(b) - nameScore(a) || b.length - a.length; })[0] || '';
     var union = [].concat.apply([], vts);
     var scored = [];
     Object.keys(players || {}).forEach(function (id) {
@@ -1336,7 +1342,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   /* ----- Mode serveur (application hors de Claude) : base et lecture d'images passent par le serveur ----- */
   var SERVER = !!window.SNATCH_SERVER;
   /* Mode « local » : tout reste sur l'appareil (base IndexedDB), lecture des images par OCR gratuit sur l'appareil. Aucun serveur, aucune API payante. */
-  var BUILD = '03/10 22:53';
+  var BUILD = '03/10 23:42';
   var LOCAL = !!window.SNATCH_LOCAL;
 
   function makeLocalShims() {
@@ -2184,6 +2190,29 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     var cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height);
     cx.imageSmoothingQuality = 'high';
     cx.drawImage(src, sx, y0, w, y1 - y0, pad, pad, cw, ch);
+    if (mode.indexOf('blob') === 0) {
+      /* lettres sombres cernées d'un liseré blanc : on ne garde que les petites formes sombres (les lettres) et on retire les grandes masses (maillot, épaules) */
+      var imb = cx.getImageData(pad, pad, cw, ch), pb = imb.data, n = cw * ch, thb = parseInt(mode.slice(4), 10) || 80, bin = new Uint8Array(n), lab = new Int32Array(n), i2, st = [], keep = new Uint8Array(n);
+      for (i2 = 0; i2 < n; i2++) bin[i2] = ((pb[i2 * 4] * 299 + pb[i2 * 4 + 1] * 587 + pb[i2 * 4 + 2] * 114) / 1000) < thb ? 1 : 0;
+      for (i2 = 0; i2 < n; i2++) {
+        if (!bin[i2] || lab[i2]) continue;
+        var comp = [], x0 = cw, x1 = 0, y0b = ch, y1b = 0;
+        lab[i2] = 1; st.push(i2);
+        while (st.length) {
+          var q = st.pop(), qx = q % cw, qy = (q - qx) / cw; comp.push(q);
+          if (qx < x0) x0 = qx; if (qx > x1) x1 = qx; if (qy < y0b) y0b = qy; if (qy > y1b) y1b = qy;
+          if (qx > 0 && bin[q - 1] && !lab[q - 1]) { lab[q - 1] = 1; st.push(q - 1); }
+          if (qx < cw - 1 && bin[q + 1] && !lab[q + 1]) { lab[q + 1] = 1; st.push(q + 1); }
+          if (qy > 0 && bin[q - cw] && !lab[q - cw]) { lab[q - cw] = 1; st.push(q - cw); }
+          if (qy < ch - 1 && bin[q + cw] && !lab[q + cw]) { lab[q + cw] = 1; st.push(q + cw); }
+        }
+        var bh = y1b - y0b + 1, bw = x1 - x0 + 1;
+        if (bh <= 0.5 * ch && bh >= 0.1 * ch && bw <= 0.45 * cw && y0b > 1 && y1b < ch - 2 && comp.length < 0.06 * n) comp.forEach(function (q) { keep[q] = 1; });
+      }
+      for (i2 = 0; i2 < n; i2++) { var vb = keep[i2] ? 0 : 255; pb[i2 * 4] = pb[i2 * 4 + 1] = pb[i2 * 4 + 2] = vb; pb[i2 * 4 + 3] = 255; }
+      cx.putImageData(imb, pad, pad);
+      return cv;
+    }
     if (mode === 'gray' || mode === 'otsu' || mode.indexOf('dark') === 0) {
       var im = cx.getImageData(pad, pad, cw, ch), p = im.data, g = new Uint8Array(cw * ch), i;
       for (i = 0; i < g.length; i++) g[i] = (p[i * 4] * 299 + p[i * 4 + 1] * 587 + p[i * 4 + 2] * 114) / 1000;
@@ -2216,7 +2245,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
         seq = seq.then(function () {
           stop();
           T.progress = 'Lecture de la carte ' + (i + 1) + ' sur ' + cells.length + '…'; renderTab();
-          var variants = [], modes = ['dark', 'otsu', 'gray', 'dark70', 'dark120', 'dark110'], m = null, chain = Promise.resolve();
+          var variants = [], modes = ['dark', 'blob80', 'otsu', 'blob55', 'gray', 'dark70', 'blob110', 'dark120', 'dark110'], m = null, chain = Promise.resolve();
           modes.forEach(function (mode) {
             chain = chain.then(function () {
               if (m && m.sure && m.best.score >= 0.95) return null;
@@ -2230,6 +2259,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
             var row = null;
             if (m.sure) row = { nom: m.best.name, lisible: true };
             else if (m.best && ((m.best.score >= 0.65 && m.margin >= 0.12) || (m.best.score >= 0.82 && m.margin >= 0.07))) row = { nom: m.best.name, lisible: false };
+            else if (card.guessed && m.best && m.best.score >= 0.55) row = { nom: m.best.name, lisible: false };
             else if (!card.guessed && m.letters >= 4) row = { nom: C.cleanOcrName(m.text) || m.text, lisible: false };
             if (!row) { skipped++; return null; }
             // poste : celui de la base s'il est connu, sinon l'étiquette lue sur la carte
@@ -2255,12 +2285,13 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
       if (!rr.length) throw { code: 'x', message: 'Aucun nom lisible sur cette capture. Vérifiez que votre base contient des joueurs (onglet Importer), ou ajoutez-les à la main.' };
       T.members = C.matchTeam(S.db.players, rr);
       T.members.forEach(function (m, i) { if (T.srcs && T.srcs[i]) m.posSrc = T.srcs[i]; });
-      var fondRead = 0;
+      var fondRead = 0, fondUnsure = [];
       T.members.forEach(function (m, i) {
         var fd = T.fds && T.fds[i];
-        if (fd && fd.p >= 0.45) { m.fond = fd.key; m.fondAuto = true; fondRead++; }
+        if (fd && fd.key) { m.fond = fd.key; m.fondAuto = true; fondRead++; if (fd.p < 0.45) fondUnsure.push(m.name); }
       });
-      if (fondRead) notes.push('Le fond de chaque carte (chance de critique) est lu automatiquement sur ' + plural(fondRead, 'carte', 'cartes') + ' : vérifiez-le, vous pouvez le corriger sur chaque carte.');
+      if (fondRead) notes.push('Le fond de chaque carte (chance de critique) est lu automatiquement sur ' + plural(fondRead, 'carte', 'cartes') + ' sur ' + T.members.length + ' : vérifiez-le, vous pouvez le corriger sur chaque carte.' + (fondUnsure.length ? ' Lecture incertaine : ' + fondUnsure.join(', ') + '.' : ''));
+      if (fondRead < T.members.length) notes.push('Fond non lu sur ' + plural(T.members.length - fondRead, 'carte', 'cartes') + ' : choisissez-le à la main sur la carte.');
       var skUnsure = 0;
       T.members.forEach(function (m, i) {
         var sk = (T.sks && T.sks[i]) || [];
