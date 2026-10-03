@@ -1342,7 +1342,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   /* ----- Mode serveur (application hors de Claude) : base et lecture d'images passent par le serveur ----- */
   var SERVER = !!window.SNATCH_SERVER;
   /* Mode « local » : tout reste sur l'appareil (base IndexedDB), lecture des images par OCR gratuit sur l'appareil. Aucun serveur, aucune API payante. */
-  var BUILD = '03/10 23:42';
+  var BUILD = '03/10 23:59';
   var LOCAL = !!window.SNATCH_LOCAL;
 
   function makeLocalShims() {
@@ -2180,6 +2180,22 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     for (i = 0; i < 256; i++) { wb += h[i]; if (!wb) continue; var wf = tot - wb; if (!wf) break; sb += i * h[i]; var mb = sb / wb, mf = (sum - sb) / wf, v = wb * wf * (mb - mf) * (mb - mf); if (v > mx) { mx = v; th = i; } }
     return th;
   }
+  /* Découpe une image « lettres seules » en lignes de texte (une ligne = un canvas), pour les lire une par une. */
+  function blobLines(c) {
+    var w = c.width, h = c.height, d = c.getContext('2d').getImageData(0, 0, w, h).data, rows = new Array(h).fill(0), x, y, segs = [], s0 = -1, last = -1;
+    for (y = 0; y < h; y++) { var n = 0; for (x = 0; x < w; x += 2) if (d[(y * w + x) * 4] < 128) n++; rows[y] = n; }
+    for (y = 0; y <= h; y++) {
+      var on = y < h && rows[y] > 1;
+      if (on) { if (s0 < 0) s0 = y; last = y; }
+      else if (s0 >= 0 && (y >= h || y - last > 0.035 * h)) { if (last - s0 >= 0.07 * h) segs.push([s0, last]); s0 = -1; }
+    }
+    return segs.slice(0, 3).map(function (sg) {
+      var pad = 16, o = document.createElement('canvas'); o.width = w; o.height = sg[1] - sg[0] + 1 + 2 * pad;
+      var ox = o.getContext('2d'); ox.fillStyle = '#fff'; ox.fillRect(0, 0, o.width, o.height);
+      ox.drawImage(c, 0, sg[0], w, sg[1] - sg[0] + 1, 0, pad, w, sg[1] - sg[0] + 1);
+      return o;
+    });
+  }
   /* Découpe la zone du nom sous la photo, l'agrandit et la prépare (noir sur blanc) pour la lecture. */
   function nameCanvas(src, card, mode) {
     var fw = card.x1 - card.x0, inset = Math.round(fw * 0.057), w = fw - 2 * inset, sx = card.x0 + inset;
@@ -2254,13 +2270,32 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
               return ocrText(c).then(function (t) { variants.push(t); m = C.matchOcrName(S.db.players, variants); });
             });
           });
+          /* nom pas reconnu avec certitude : lecture ligne par ligne des lettres isolées (plus fiable que le bloc entier) */
+          chain = chain.then(function () {
+            if (m && m.sure && m.best.score >= 0.95) return null;
+            return ocrWorker().then(function (w) {
+              var c2 = Promise.resolve();
+              ['blob80', 'blob110', 'blob55'].forEach(function (mode) {
+                c2 = c2.then(function () {
+                  var cvn = nameCanvas(cv, card, mode); if (!cvn) return null;
+                  var lines = blobLines(cvn); if (!lines.length) return null;
+                  var parts = [], c3 = w.setParameters({ tessedit_pageseg_mode: '7' });
+                  lines.forEach(function (lc) { c3 = c3.then(function () { return w.recognize(lc); }).then(function (r) { parts.push(String((r && r.data && r.data.text) || '').trim()); }); });
+                  return c3.then(function () { variants.push(parts.join(' ')); m = C.matchOcrName(S.db.players, variants); });
+                });
+              });
+              return c2.then(function () { return w.setParameters({ tessedit_pageseg_mode: '6' }); });
+            }).catch(function () { return null; });
+          });
           return chain.then(function () {
             if (!m) { skipped++; return null; }
-            var row = null;
+            var row = null, rawN = C.cleanOcrName(m.text) || '';
+            /* lecture nette de deux mots : on ne la remplace pas par un joueur de la base qui ne lui ressemble qu'à moitié */
+            var rawClean = rawN.split(/\s+/).filter(function (w) { return w.replace(/[^A-Za-z\u00C0-\u024F]/g, '').length >= 3; }).length >= 2;
             if (m.sure) row = { nom: m.best.name, lisible: true };
-            else if (m.best && ((m.best.score >= 0.65 && m.margin >= 0.12) || (m.best.score >= 0.82 && m.margin >= 0.07))) row = { nom: m.best.name, lisible: false };
-            else if (card.guessed && m.best && m.best.score >= 0.55) row = { nom: m.best.name, lisible: false };
-            else if (!card.guessed && m.letters >= 4) row = { nom: C.cleanOcrName(m.text) || m.text, lisible: false };
+            else if (m.best && ((m.best.score >= 0.65 && m.margin >= 0.12) || (m.best.score >= 0.82 && m.margin >= 0.07)) && !(rawClean && m.best.score < 0.8)) row = { nom: m.best.name, lisible: false };
+            else if (card.guessed && m.best && m.best.score >= 0.55 && !rawClean) row = { nom: m.best.name, lisible: false };
+            else if ((!card.guessed || rawClean) && m.letters >= 4) row = { nom: C.cleanOcrName(m.text) || m.text, lisible: false };
             if (!row) { skipped++; return null; }
             // poste : celui de la base s'il est connu, sinon l'étiquette lue sur la carte
             var dbp = m.sure ? S.db.players[m.best.id] : null;
