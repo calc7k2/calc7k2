@@ -1336,7 +1336,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   /* ----- Mode serveur (application hors de Claude) : base et lecture d'images passent par le serveur ----- */
   var SERVER = !!window.SNATCH_SERVER;
   /* Mode « local » : tout reste sur l'appareil (base IndexedDB), lecture des images par OCR gratuit sur l'appareil. Aucun serveur, aucune API payante. */
-  var BUILD = '03/10 22:41';
+  var BUILD = '03/10 22:53';
   var LOCAL = !!window.SNATCH_LOCAL;
 
   function makeLocalShims() {
@@ -1900,6 +1900,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   function tagCanvas(src, card, ang, th) {
     var w = card.x1 - card.x0, sc = 3;
     var xa = Math.round(card.x0 + 0.74 * w), xb = Math.round(card.x1), ya = Math.max(0, Math.round(card.top - 1.40 * w)), yb = Math.round(card.top - 1.04 * w);
+    if (card.profile) { xa = Math.round(card.x0 + 0.76 * w); ya = Math.max(0, Math.round(card.top - 1.36 * w)); yb = Math.round(card.top - 1.13 * w); }
     if (yb - ya < 20 || xb - xa < 20) return null;
     var cw = (xb - xa) * sc, ch = (yb - ya) * sc, rad = ang * Math.PI / 180, pad = 30;
     var nw = Math.ceil(Math.abs(cw * Math.cos(rad)) + Math.abs(ch * Math.sin(rad))), nh = Math.ceil(Math.abs(cw * Math.sin(rad)) + Math.abs(ch * Math.cos(rad)));
@@ -2107,6 +2108,49 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     });
     return { cards: cards, W: W, H: H, bands: bands };
   }
+  /* Page de profil Snatch (cadre jaune, 3 colonnes, pas de bandeau de prix) : on repère le cadre, puis la grille de cartes. */
+  function findProfileCards(cv) {
+    var W = cv.width, H = cv.height, d = cv.getContext('2d').getImageData(0, 0, W, H).data, x, y;
+    function yel(i) { var r = d[i], g = d[i + 1], b = d[i + 2]; return r > 115 && g > 90 && b < 130 && r - b > 95 && r >= g && g > 0.72 * r; }
+    function run(cnt, n, thr) {
+      var best = null, s0 = -1, last = -1, i;
+      for (i = 0; i <= n; i++) {
+        var on = i < n && cnt[i] >= thr;
+        if (on) { if (s0 < 0) s0 = i; last = i; }
+        else if (s0 >= 0 && (i >= n || i - last > Math.max(12, n * 0.02))) { if (!best || last - s0 > best[1] - best[0]) best = [s0, last]; s0 = -1; }
+      }
+      return best;
+    }
+    var rows = new Array(H).fill(0);
+    for (y = 0; y < H; y++) { var c = 0; for (x = 0; x < W; x += 2) if (yel((y * W + x) * 4)) c++; rows[y] = c * 2; }
+    var ry = run(rows, H, 0.1 * W);
+    if (!ry) return { cards: [], W: W, H: H, bands: [] };
+    var cols = new Array(W).fill(0);
+    for (x = 0; x < W; x++) { var c2 = 0; for (y = ry[0]; y <= ry[1]; y += 2) if (yel((y * W + x) * 4)) c2++; cols[x] = c2 * 2; }
+    var rx = run(cols, W, 0.1 * (ry[1] - ry[0]));
+    if (!rx) return { cards: [], W: W, H: H, bands: [] };
+    var fw = rx[1] - rx[0], fh = ry[1] - ry[0], w = fw / 3.432, n = Math.round((fh / w - 0.096) / 1.448);
+    if (w < 0.08 * W || n < 1 || n > 4 || Math.abs(fh / w - (1.448 * n + 0.096)) > 0.45) return { cards: [], W: W, H: H, bands: [] };
+    var pad = 0.104 * w, gap = 0.112 * w, ch = 1.336 * w, pitch = ch + gap, cards = [], bands = [];
+    /* case vide : rectangle flou presque uniforme (très peu de contraste), sans photo ni texte */
+    function flat(cd) {
+      var xa = cd.x0 + Math.round(0.1 * w), xb = cd.x1 - Math.round(0.1 * w), ya = cd.top - Math.round(1.1 * w), yb = cd.top - Math.round(0.1 * w), n = 0, s1 = 0, s2 = 0, dark = 0, px, py;
+      if (ya < 0 || yb > H) return false;
+      for (py = ya; py < yb; py += 3) for (px = xa; px < xb; px += 3) { var i = (py * W + px) * 4, l = (d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000; n++; s1 += l; s2 += l * l; if (l < 60) dark++; }
+      var m = s1 / n, sd = Math.sqrt(Math.max(0, s2 / n - m * m));
+      return sd < 22 && dark / n < 0.02;
+    }
+    for (var r = 0; r < n; r++) {
+      var bottom = Math.round(ry[0] + pad + r * pitch + ch);
+      bands.push({ y0: bottom, y1: bottom });
+      for (var k = 0; k < 3; k++) {
+        var x0 = Math.round(rx[0] + pad + k * (w + gap));
+        var cd = { x0: x0, x1: Math.round(x0 + w), top: bottom, row: r, profile: true };
+        if (!flat(cd)) cards.push(cd);
+      }
+    }
+    return { cards: cards, W: W, H: H, bands: bands, profile: true };
+  }
   /* Ajoute les cartes dont le bandeau est caché (derrière le panneau du bas) : même grille, ligne suivante. */
   function completeGrid(found) {
     var cards = found.cards.slice(), cols = [];
@@ -2160,9 +2204,11 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     renderTab();
     var stop = function () { if (ctl.cancelled) throw { code: 'cancelled' }; };
     return bitmapCanvas(file, 3200).then(function (cv) {
-      var found = findCardStrips(cv);
-      if (!found.cards.length) throw { code: 'x', message: 'Je ne reconnais pas cette mise en page (cartes du Lineup Snatch avec leur bandeau de prix). Ajoutez les joueurs à la main avec « Ajouter un joueur ».' };
-      var grid = completeGrid(found), cells = grid.cards;
+      var found = findCardStrips(cv), isProfile = false;
+      if (!found.cards.length) { found = findProfileCards(cv); isProfile = !!found.cards.length; }
+      T.profile = isProfile;
+      if (!found.cards.length) throw { code: 'x', message: 'Je ne reconnais pas cette mise en page (cartes du Lineup Snatch avec leur bandeau de prix, ou page de profil avec le cadre jaune). Ajoutez les joueurs à la main avec « Ajouter un joueur ».' };
+      var grid = isProfile ? { cards: found.cards, guessed: 0 } : completeGrid(found), cells = grid.cards;
       cells.sort(function (a, b) { return a.row - b.row || a.x0 - b.x0; });
       T.progress = 'Chargement du moteur de lecture (première fois seulement)…'; renderTab();
       var rows = [], srcs = [], sks = [], fds = [], skipped = 0, seq = Promise.resolve();
@@ -2224,7 +2270,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
       });
       if (skUnsure) notes.push('Le chiffre (x2, x3…) de ' + plural(skUnsure, 'compétence', 'compétences') + ' n\'a pas pu être lu : x1 appliqué, vérifiez-le sur la carte.');
       // étiquette illisible et équipe de 7 : l'ordre des cartes est gardien, 2 défenseurs, 2 milieux, 2 attaquants
-      if (T.members.length === 7) {
+      if (T.members.length === 7 && !T.profile) {
         var inferred = 0;
         T.members.forEach(function (m, i) {
           var p = m.id ? S.db.players[m.id] : null;
@@ -3151,7 +3197,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     renderTab();
     initStorage().then(function () { return loadMine(); }).then(function () { return loadOpp(); }).then(function () { S.ready = true; renderTab(); }).catch(function () { S.ready = true; renderTab(); });
   }
-  window.SnatchApp = { fondThumb: fondThumb, fondFeatures: fondFeatures, fondPredict: fondPredict, readCardFond: readCardFond, nameCanvas: nameCanvas, ocrText: ocrText, readCardSkills: readCardSkills, skSlots: skSlots, findCardStrips: findCardStrips, completeGrid: completeGrid, tagCanvas: tagCanvas, bitmapCanvas: bitmapCanvas, S: S, C: C, startImport: startImport, saveJob: saveJob, jobReport: jobReport, renderTab: renderTab, analyseScreenshot: analyseScreenshot, teamCalc: teamCalc, effStats: effStats, boot: boot };
+  window.SnatchApp = { fondThumb: fondThumb, fondFeatures: fondFeatures, fondPredict: fondPredict, readCardFond: readCardFond, nameCanvas: nameCanvas, ocrText: ocrText, readCardSkills: readCardSkills, skSlots: skSlots, findCardStrips: findCardStrips, findProfileCards: findProfileCards, completeGrid: completeGrid, tagCanvas: tagCanvas, bitmapCanvas: bitmapCanvas, S: S, C: C, startImport: startImport, saveJob: saveJob, jobReport: jobReport, renderTab: renderTab, analyseScreenshot: analyseScreenshot, teamCalc: teamCalc, effStats: effStats, boot: boot };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
 
