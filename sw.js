@@ -1,5 +1,5 @@
 /* Cache hors-ligne : l'application et les bibliothèques libres (PDF, Excel, lecture d'images) téléchargées une fois restent sur l'appareil. */
-var CACHE = 'snatch-1791042993703';
+var CACHE = 'snatch-1791058930019';
 var CORE = ['./', 'index.html', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(CORE); }).then(function () { return self.skipWaiting(); }));
