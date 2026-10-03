@@ -1,6 +1,6 @@
 {
- "name": "Sorare Snatch Calculator",
- "short_name": "Snatch Calc",
+ "name": "Calculateur",
+ "short_name": "Calcul",
  "lang": "fr",
  "start_url": "./",
  "scope": "./",

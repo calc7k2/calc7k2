@@ -1,5 +1,5 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0e6b49"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Snatch Calc"><meta name="apple-mobile-web-app-status-bar-style" content="default"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="icon" href="icon.svg" type="image/svg+xml"><style>html{background:var(--bg)}body{margin-left:auto;margin-right:auto}:root{padding-top:env(safe-area-inset-top,0px)}</style><meta charset="utf-8">
-<title>Sorare Snatch Calculator</title>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0e6b49"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="robots" content="noindex,nofollow,noarchive,noimageindex"><meta name="googlebot" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><meta name="apple-mobile-web-app-title" content="Calculateur"><meta name="apple-mobile-web-app-status-bar-style" content="default"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="icon" href="icon.svg" type="image/svg+xml"><style>html{background:var(--bg)}body{margin-left:auto;margin-right:auto}:root{padding-top:env(safe-area-inset-top,0px)}</style><meta charset="utf-8">
+<title>Calculateur</title>
 <style>
 /* Terrain : fond craie à reflet vert, vert pelouse en accent, bleu acier = DEF, vermillon = ATK, ambre = donnée manquante */
 :root {
@@ -279,7 +279,7 @@ td:first-child { width: 58%; }
 .mactions.skills .skcell > .btn:first-child { overflow: hidden; }
 
 </style></head><body>
-<header class="top"><div class="brand">Sorare <span>Snatch</span> Calculator</div><div id="status" class="status" role="status"></div></header>
+<header class="top"><div class="brand">Mon <span>calculateur</span></div><div id="status" class="status" role="status"></div></header>
 <main id="view"></main>
 <nav class="tabbar" aria-label="Navigation"><div>
   <button data-tab="analyse"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l2-2.5h6L17 7h3v12H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.4" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>Analyser</button>
@@ -291,7 +291,7 @@ td:first-child { width: 58%; }
 <div id="toast" role="status" hidden></div>
 <script>window.SNATCH_LOCAL=true;if("serviceWorker" in navigator&&/^https:|^http:\/\/localhost/.test(location.href)){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})})}</script>
 <script>
-/* Sorare Snatch Calculator — moteur (données, fusion, lecture de tableaux, calculs).
+/* Calculateur — moteur (données, fusion, lecture de tableaux, calculs).
    Aucune dépendance. Utilisable dans le navigateur (window.Core) et dans Node (tests). */
 (function (root) {
   'use strict';
@@ -1128,7 +1128,7 @@ td:first-child { width: 58%; }
 
 </script>
 <script>
-/* ===== Sorare Snatch Calculator — interface ===== */
+/* ===== Calculateur — interface ===== */
 (function () {
   'use strict';
   var C = window.Core;
@@ -1203,7 +1203,7 @@ td:first-child { width: 58%; }
   /* ----- Mode serveur (application hors de Claude) : base et lecture d'images passent par le serveur ----- */
   var SERVER = !!window.SNATCH_SERVER;
   /* Mode « local » : tout reste sur l'appareil (base IndexedDB), lecture des images par OCR gratuit sur l'appareil. Aucun serveur, aucune API payante. */
-  var BUILD = '03/10 17:03';
+  var BUILD = '03/10 17:18';
   var LOCAL = !!window.SNATCH_LOCAL;
 
   function makeLocalShims() {
