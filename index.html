@@ -1,0 +1,2385 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0e6b49"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Snatch Calc"><meta name="apple-mobile-web-app-status-bar-style" content="default"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="icon" href="icon.svg" type="image/svg+xml"><style>html{background:var(--bg)}body{margin-left:auto;margin-right:auto}:root{padding-top:env(safe-area-inset-top,0px)}</style><title>Sorare Snatch Calculator</title>
+<style>
+/* Terrain : fond craie à reflet vert, vert pelouse en accent, bleu acier = DEF, vermillon = ATK, ambre = donnée manquante */
+:root {
+  --bg: #edf1ec; --surface: #ffffff; --surface2: #f5f8f4; --ink: #14201a; --muted: #5a6a61; --line: #d6ded7;
+  --accent: #0e6b49; --accent-ink: #ffffff; --accent-soft: #dcefe6;
+  --def: #1b5fa6; --def-soft: #e0ecf8; --atk: #bf3f10; --atk-soft: #fbe6dc;
+  --warn: #8a5100; --warn-soft: #fdf0d3; --warn-line: #e9c777;
+  --bad: #b3261e; --bad-soft: #fbe4e1; --ok: #0e6b49; --ok-soft: #dcefe6;
+  --shadow: 0 1px 2px rgba(20, 32, 26, .06), 0 4px 14px rgba(20, 32, 26, .05);
+  --f-body: 'Barlow', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --f-num: 'Barlow Condensed', 'Barlow', system-ui, -apple-system, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1511; --surface: #15211b; --surface2: #1a2922; --ink: #e5eee8; --muted: #94a69b; --line: #26382d;
+    --accent: #48c18c; --accent-ink: #06130d; --accent-soft: #17382a;
+    --def: #7db4ee; --def-soft: #16304b; --atk: #ff9a6e; --atk-soft: #4a2415;
+    --warn: #f0c36a; --warn-soft: #382b10; --warn-line: #6b5420;
+    --bad: #ff8f86; --bad-soft: #3d1a17; --ok: #48c18c; --ok-soft: #17382a;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 14px rgba(0, 0, 0, .25);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1511; --surface: #15211b; --surface2: #1a2922; --ink: #e5eee8; --muted: #94a69b; --line: #26382d;
+  --accent: #48c18c; --accent-ink: #06130d; --accent-soft: #17382a;
+  --def: #7db4ee; --def-soft: #16304b; --atk: #ff9a6e; --atk-soft: #4a2415;
+  --warn: #f0c36a; --warn-soft: #382b10; --warn-line: #6b5420;
+  --bad: #ff8f86; --bad-soft: #3d1a17; --ok: #48c18c; --ok-soft: #17382a;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 14px rgba(0, 0, 0, .25);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 17px; line-height: 1.4;
+  padding-inline: 16px; padding-block: 0 112px; margin: 0 auto; max-width: 640px;
+  -webkit-tap-highlight-color: transparent;
+}
+h1, h2, h3, p { margin: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+small { font-size: 13px; color: var(--muted); }
+b { font-weight: 600; }
+.muted { color: var(--muted); }
+.small { font-size: 14px; }
+.pad { padding: 14px 4px; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-block: 14px 6px; }
+.brand { font-family: var(--f-num); font-weight: 700; font-size: 22px; letter-spacing: .02em; text-transform: uppercase; }
+.brand span { color: var(--accent); }
+.status { font-size: 13px; color: var(--muted); min-height: 1em; }
+.status.bad { color: var(--bad); }
+
+.hero { display: flex; flex-direction: column; gap: 12px; padding-block: 10px 6px; }
+.hero h1 { font-family: var(--f-num); font-size: 34px; line-height: 1.05; font-weight: 700; text-wrap: balance; }
+.hero .sub { color: var(--muted); font-size: 16px; }
+.sec { font-family: var(--f-num); font-size: 22px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; margin-block: 22px 10px; }
+.sec.in { margin-block: 0 8px; }
+
+/* Boutons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; padding: 12px 18px;
+  border-radius: 14px; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink);
+  font-weight: 600; font-size: 17px; cursor: pointer; text-align: center; box-shadow: var(--shadow); user-select: none;
+}
+.btn:active { transform: translateY(1px); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.big { min-height: 64px; font-size: 19px; width: 100%; }
+.btn.big svg { width: 26px; height: 26px; flex: none; }
+.btn.small { min-height: 44px; padding: 8px 14px; font-size: 15px; }
+.btn.ghost { background: transparent; box-shadow: none; }
+.btn.danger { border-color: var(--bad); color: var(--bad); background: transparent; box-shadow: none; }
+.btn.ghostd { margin-top: 10px; width: 100%; }
+.link { background: none; border: 0; padding: 0; color: var(--accent); font-weight: 600; text-decoration: underline; cursor: pointer; font-size: inherit; }
+.row { display: flex; flex-wrap: wrap; }
+.gap { gap: 10px; margin-block: 10px; }
+.row.gap > .btn:not(.big) { flex: 1 1 auto; }
+
+.seg { display: flex; background: var(--surface2); border: 1.5px solid var(--line); border-radius: 14px; padding: 3px; gap: 3px; }
+.segb { flex: 1; min-height: 46px; border: 0; border-radius: 11px; background: transparent; font-weight: 600; cursor: pointer; font-size: 16px; }
+.seg.small .segb { min-height: 40px; font-size: 14px; }
+.segb.on { background: var(--accent); color: var(--accent-ink); }
+
+/* Cartes */
+.card { background: var(--surface); border: 1.5px solid var(--line); border-radius: 18px; padding: 16px; margin-block: 12px; box-shadow: var(--shadow); min-width: 0; }
+.card.busy, .busy.inline { display: flex; align-items: center; gap: 14px; }
+.busy.inline { padding-block: 6px; }
+.card.alert.bad { background: var(--bad-soft); border-color: var(--bad); }
+.card.alert.warn { background: var(--warn-soft); border-color: var(--warn-line); }
+.card.shot summary { cursor: pointer; font-weight: 600; min-height: 32px; }
+.card.shot img { display: block; width: 100%; max-height: 460px; object-fit: contain; border-radius: 12px; margin-top: 10px; background: var(--surface2); }
+.note { padding: 10px 12px; border-radius: 12px; margin-block: 8px; background: var(--surface2); font-size: 15px; }
+.note.warn { background: var(--warn-soft); color: var(--warn); border: 1px solid var(--warn-line); }
+.note.bad { background: var(--bad-soft); color: var(--bad); border: 1px solid var(--bad); }
+.note.ok { background: var(--ok-soft); color: var(--ok); border: 1px solid var(--ok); }
+.note.small { font-size: 14px; padding: 8px 10px; }
+.warn { color: var(--warn); }
+.spin { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--accent); animation: sp 0.9s linear infinite; flex: none; }
+@keyframes sp { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
+.boot { display: flex; flex-direction: column; align-items: center; gap: 14px; padding-block: 80px; color: var(--muted); }
+
+/* Puces */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-block: 8px 2px; }
+.chips.tiny { margin: 0; justify-content: flex-end; }
+.chip { display: inline-flex; align-items: baseline; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: 14px; font-weight: 500; background: var(--surface2); border: 1px solid var(--line); white-space: nowrap; }
+.chip b { font-family: var(--f-num); font-size: 18px; line-height: 1; font-variant-numeric: tabular-nums; }
+.chip i { font-style: normal; font-size: 12px; opacity: .8; }
+.chip.def { background: var(--def-soft); color: var(--def); border-color: transparent; }
+.chip.atk { background: var(--atk-soft); color: var(--atk); border-color: transparent; }
+.chip.miss { background: transparent; color: var(--warn); border: 1.5px dashed var(--warn-line); }
+.chip.ok { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+.chip.warnc { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
+.chip.tiny { padding: 1px 8px; font-size: 13px; }
+.sum .chip b { font-size: 20px; }
+.badge { padding: 3px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; white-space: nowrap; align-self: flex-start; }
+.badge.ok { background: var(--ok-soft); color: var(--ok); }
+.badge.warn { background: var(--warn-soft); color: var(--warn); }
+.badge.bad { background: var(--bad-soft); color: var(--bad); }
+
+/* Équipe */
+.members { display: flex; flex-direction: column; gap: 12px; }
+.member { background: var(--surface); border: 1.5px solid var(--line); border-radius: 18px; padding: 14px; box-shadow: var(--shadow); min-width: 0; }
+.member.unres { border-color: var(--warn-line); }
+.mhead { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.mname { font-size: 20px; font-weight: 600; overflow-wrap: anywhere; }
+.msub { color: var(--muted); font-size: 14px; }
+.cands { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.cands .lbl { font-size: 14px; color: var(--muted); }
+.cand-btn { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 52px; padding: 8px 12px; border: 1.5px solid var(--accent); background: var(--accent-soft); border-radius: 12px; cursor: pointer; text-align: left; }
+.mactions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.check { display: flex; align-items: center; gap: 12px; min-height: 48px; margin-top: 6px; font-size: 16px; cursor: pointer; }
+.check input { width: 26px; height: 26px; accent-color: var(--accent); flex: none; }
+
+/* Formulaires */
+.field { display: flex; flex-direction: column; gap: 5px; margin-block: 8px; min-width: 0; }
+.field > span { font-size: 15px; font-weight: 600; }
+.field small { font-size: 12.5px; }
+input[type=text], input[type=search], select, textarea {
+  width: 100%; min-height: 50px; padding: 10px 14px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--surface2); font-size: 18px;
+}
+textarea { min-height: 110px; resize: vertical; }
+.search { margin-block: 4px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 360px) { .grid2 { grid-template-columns: 1fr; } }
+details.more { margin-block: 8px; }
+details.more > summary { cursor: pointer; font-weight: 600; min-height: 36px; display: flex; align-items: center; }
+details.card.more { padding-block: 10px; }
+
+/* Résultats */
+.stat .shead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+.stat h3 { font-family: var(--f-num); font-size: 22px; text-transform: uppercase; letter-spacing: .03em; }
+.stat.def h3 { color: var(--def); }
+.stat.atk h3 { color: var(--atk); }
+.big { font-family: var(--f-num); font-size: 44px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.big small { font-size: 20px; font-weight: 500; }
+.stat.def .big:not(.warn) { color: var(--def); }
+.stat.atk .big:not(.warn) { color: var(--atk); }
+.big.warn { font-size: 28px; }
+.rule { margin-bottom: 4px; }
+.cl { display: flex; flex-direction: column; gap: 8px; }
+details.cand { border: 1.5px solid var(--line); border-radius: 14px; background: var(--surface2); }
+details.cand > summary { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 52px; padding: 8px 14px; cursor: pointer; list-style: none; }
+details.cand > summary::-webkit-details-marker { display: none; }
+details.cand > summary::after { content: '▾'; color: var(--muted); margin-left: 4px; }
+details.cand[open] > summary::after { content: '▴'; }
+details.cand > summary > span:first-child { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.tot { font-family: var(--f-num); font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tot small { font-size: 13px; font-family: var(--f-body); font-weight: 500; }
+details.cand > .note { margin-inline: 12px; }
+.tw { overflow-x: auto; padding: 0 10px 10px; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 15px; }
+th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 4px 6px; border-bottom: 1px solid var(--line); }
+th:nth-child(n+2), td:nth-child(n+2) { text-align: right; }
+td { padding: 7px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+td small { display: block; }
+tr.principal td:first-child { font-weight: 600; }
+tfoot td { font-weight: 500; }
+tfoot tr.total td { font-weight: 700; font-size: 17px; border-top: 2px solid var(--ink); border-bottom: 0; }
+tfoot tr.crit td { color: var(--muted); font-style: italic; border-bottom: 0; }
+
+/* Importation */
+.job .jh { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.job .jh b { overflow-wrap: anywhere; }
+.job .jh small { display: block; }
+.x { width: 40px; height: 40px; border-radius: 12px; border: 1.5px solid var(--line); background: transparent; font-size: 22px; line-height: 1; cursor: pointer; flex: none; }
+.confirm { border-top: 1px solid var(--warn-line); padding-top: 8px; margin-top: 8px; }
+.clabel { margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.opts { display: flex; flex-direction: column; gap: 6px; }
+.opt { min-height: 46px; padding: 8px 12px; border-radius: 12px; border: 1.5px solid var(--warn-line); background: var(--surface); text-align: left; cursor: pointer; color: var(--ink); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.opt.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.opt small { color: inherit; opacity: .8; }
+.conf { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; font-size: 15px; }
+.rows, .hist, .plist { list-style: none; margin: 0; padding: 0; }
+.rows li { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 15px; align-items: center; }
+.rows li > span:first-child { overflow-wrap: anywhere; min-width: 0; }
+.rows em { font-style: normal; font-size: 12px; color: var(--muted); margin-left: 6px; }
+.rows .chips { flex-wrap: nowrap; align-items: center; }
+.hist li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.hist li > div { min-width: 0; }
+.hist b { overflow-wrap: anywhere; }
+.hist small { display: block; }
+.hist .hc { text-align: right; flex: none; max-width: 52%; }
+
+/* Joueurs */
+.prow { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 56px; padding: 8px 4px; border: 0; border-bottom: 1px solid var(--line); background: transparent; text-align: left; cursor: pointer; }
+.pn { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.dupg { border: 1.5px solid var(--line); border-radius: 14px; padding: 10px; margin-block: 8px; display: flex; flex-direction: column; gap: 8px; }
+.dp { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.dp small { display: block; }
+
+/* Navigation et fenêtres */
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; justify-content: center;
+  background: color-mix(in srgb, var(--surface) 94%, transparent); border-top: 1.5px solid var(--line);
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.tabbar > div { display: flex; width: 100%; max-width: 640px; gap: 4px; }
+.tabbar button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 58px; border: 0; background: transparent; border-radius: 14px; color: var(--muted); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.tabbar svg { width: 26px; height: 26px; }
+.tabbar button.on { color: var(--accent); background: var(--accent-soft); }
+#modal { position: fixed; inset: 0; z-index: 40; }
+.scrim { position: absolute; inset: 0; background: rgba(8, 14, 11, .55); }
+.sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; max-height: 88%; overflow-y: auto; margin-inline: auto; max-width: 640px;
+  background: var(--surface); border-radius: 22px 22px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -8px 30px rgba(0, 0, 0, .25);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.sheet h2 { font-family: var(--f-num); font-size: 26px; font-weight: 700; }
+#toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom, 0px)); z-index: 50; background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 999px; font-weight: 600; font-size: 15px; max-width: 90%; }
+[hidden] { display: none !important; }
+
+.stat .shead { flex-wrap: wrap; }
+.big { white-space: nowrap; }
+td:first-child { width: 58%; }
+
+</style></head><body>
+<header class="top"><div class="brand">Sorare <span>Snatch</span> Calculator</div><div id="status" class="status" role="status"></div></header>
+<main id="view"></main>
+<nav class="tabbar" aria-label="Navigation"><div>
+  <button data-tab="analyse"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l2-2.5h6L17 7h3v12H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.4" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>Analyser</button>
+  <button data-tab="import"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Importer</button>
+  <button data-tab="players"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 19c.5-3.2 2.8-5 5.5-5s5 1.8 5.5 5M16 6.2a3 3 0 0 1 0 5.6M18 14.3c1.7.6 2.9 2.2 3.2 4.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Joueurs</button>
+  <button data-tab="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h9m4 0h1M5 17h3m4 0h7M5 12h1m4 0h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>Réglages</button>
+</div></nav>
+<div id="modal" hidden></div>
+<div id="toast" role="status" hidden></div>
+<script>window.SNATCH_LOCAL=true;if("serviceWorker" in navigator&&/^https:|^http:\/\/localhost/.test(location.href)){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})})}</script>
+<script>
+/* Sorare Snatch Calculator — moteur (données, fusion, lecture de tableaux, calculs).
+   Aucune dépendance. Utilisable dans le navigateur (window.Core) et dans Node (tests). */
+(function (root) {
+  'use strict';
+
+  var STATS = ['def', 'atk'];
+  var DEFAULT_RULES = { mainPct: 100, supportPct: 25, rounding: 'ceil' };
+  var FUZZY_MIN = 0.85;
+
+  /* ---------- Noms ---------- */
+
+  var SPECIAL = { 'ø': 'o', 'ł': 'l', 'đ': 'd', 'æ': 'ae', 'œ': 'oe', 'ß': 'ss', 'ð': 'd', 'þ': 'th', 'ı': 'i' };
+
+  function normText(s) {
+    if (s == null) return '';
+    s = String(s).toLowerCase();
+    s = s.replace(/[øłđæœßðþı]/g, function (c) { return SPECIAL[c]; });
+    s = s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+    s = s.replace(/[’'`´]/g, '');
+    s = s.replace(/[^\p{L}\p{N}]+/gu, ' ');
+    return s.trim();
+  }
+
+  function tokens(name) {
+    var t = normText(name);
+    return t ? t.split(' ') : [];
+  }
+
+  /* Clé de comparaison : mots triés, donc « Dupont Paul » = « Paul Dupont ». */
+  function nameKey(name) {
+    return tokens(name).sort().join(' ');
+  }
+
+  function lev(a, b) {
+    if (a === b) return 0;
+    var m = a.length, n = b.length;
+    if (!m) return n;
+    if (!n) return m;
+    var prev = new Array(n + 1), cur = new Array(n + 1), i, j;
+    for (j = 0; j <= n; j++) prev[j] = j;
+    for (i = 1; i <= m; i++) {
+      cur[0] = i;
+      for (j = 1; j <= n; j++) {
+        var cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
+        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+      }
+      var t = prev; prev = cur; cur = t;
+    }
+    return prev[n];
+  }
+
+  function sim(a, b) {
+    var L = Math.max(a.length, b.length);
+    return L ? 1 - lev(a, b) / L : 1;
+  }
+
+  /* ---------- Nombres ---------- */
+
+  function parseNum(v) {
+    if (v == null) return null;
+    if (typeof v === 'number') return isFinite(v) ? v : null;
+    var s = String(v).trim().replace(/ /g, ' ');
+    if (!s) return null;
+    var m = s.match(/-?\d+(?:[.,]\d+)?/);
+    if (!m) return null;
+    var n = parseFloat(m[0].replace(',', '.'));
+    return isFinite(n) ? n : null;
+  }
+
+  /* ---------- Index et correspondance ---------- */
+
+  function buildIndex(players) {
+    var byKey = {}, keyOf = {}, list = [];
+    Object.keys(players).forEach(function (id) {
+      var k = nameKey(players[id].name);
+      keyOf[id] = k;
+      (byKey[k] = byKey[k] || []).push(id);
+      list.push(id);
+    });
+    return { byKey: byKey, keyOf: keyOf, list: list };
+  }
+
+  function indexAdd(idx, p) {
+    var k = nameKey(p.name);
+    idx.keyOf[p.id] = k;
+    (idx.byKey[k] = idx.byKey[k] || []).push(p.id);
+    idx.list.push(p.id);
+  }
+
+  function indexRemoveKey(idx, id, key) {
+    var a = idx.byKey[key];
+    if (a) {
+      var i = a.indexOf(id);
+      if (i >= 0) a.splice(i, 1);
+      if (!a.length) delete idx.byKey[key];
+    }
+  }
+
+  function sameClub(a, b) {
+    var x = normText(a), y = normText(b);
+    return !!x && !!y && x === y;
+  }
+
+  /* Cherche les joueurs correspondant à un nom.
+     Retourne { status: 'exact'|'confirm'|'new', id, candidates:[{id,score,why}] } */
+  function findMatch(players, idx, name, club, forceConfirm) {
+    var key = nameKey(name);
+    if (!key) return { status: 'new', candidates: [] };
+    var exact = idx.byKey[key] || [];
+    var cands = [];
+
+    if (exact.length === 1 && !forceConfirm) {
+      return { status: 'exact', id: exact[0], candidates: [] };
+    }
+    if (exact.length > 1 && !forceConfirm) {
+      var byClub = exact.filter(function (id) { return sameClub(players[id].club, club); });
+      if (byClub.length === 1) return { status: 'exact', id: byClub[0], candidates: [] };
+      exact.forEach(function (id) { cands.push({ id: id, score: 1, why: 'même nom' }); });
+      return { status: 'confirm', candidates: cands };
+    }
+    exact.forEach(function (id) { cands.push({ id: id, score: 1, why: 'même nom' }); });
+
+    var tk = tokens(name);
+    var seen = {};
+    exact.forEach(function (id) { seen[id] = 1; });
+    var hasInitial = tk.some(function (t) { return t.length === 1; });
+
+    idx.list.forEach(function (id) {
+      if (seen[id]) return;
+      var pk = idx.keyOf[id];
+      if (!pk) return;
+      var score = sim(key, pk), why = 'nom proche';
+      var pt = pk.split(' ');
+      // « P. Dupont » ↔ « Paul Dupont »
+      if (hasInitial) {
+        var rest = tk.filter(function (t) { return t.length > 1; });
+        var inits = tk.filter(function (t) { return t.length === 1; });
+        var okRest = rest.length && rest.every(function (t) { return pt.indexOf(t) >= 0; });
+        var okInit = inits.every(function (c) {
+          return pt.some(function (t) { return t.length > 1 && t.charAt(0) === c && rest.indexOf(t) < 0; });
+        });
+        if (okRest && okInit && score < 0.9) { score = 0.9; why = 'initiale'; }
+      }
+      // « Vinicius » ↔ « Vinicius Junior »
+      if (score < FUZZY_MIN && tk.length && pt.length && tk.length !== pt.length) {
+        var small = tk.length < pt.length ? tk : pt, big = tk.length < pt.length ? pt : tk;
+        var inc = small.every(function (t) { return big.indexOf(t) >= 0; });
+        var longTok = small.some(function (t) { return t.length >= 4; });
+        if (inc && longTok) { score = Math.max(score, 0.8); why = 'nom partiel'; }
+      }
+      if (score >= FUZZY_MIN || (why !== 'nom proche' && score >= 0.8)) {
+        cands.push({ id: id, score: score, why: why });
+      }
+    });
+
+    cands.sort(function (a, b) { return b.score - a.score; });
+    cands = cands.slice(0, 4);
+    if (!cands.length) return { status: 'new', candidates: [] };
+    return { status: 'confirm', candidates: cands };
+  }
+
+  /* ---------- Fusion / import ---------- */
+
+  function randomId(chunks) {
+    var c = Math.floor(Math.random() * (chunks || 48));
+    var s = '';
+    var chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+    for (var i = 0; i < 7; i++) s += chars.charAt(Math.floor(Math.random() * chars.length));
+    return (c < 10 ? '0' : '') + c + '-' + s;
+  }
+
+  function clonePlayer(p) {
+    return JSON.parse(JSON.stringify(p));
+  }
+
+  /* rows : [{name, def, atk, pos, club, unreadable}]
+     decisions : { [rowIndex]: 'new' | 'skip' | playerId }
+     keepOld   : { 'rowIndex:stat': true }
+     meta      : { file, date }
+     Ne modifie jamais `players`. Retourne les joueurs modifiés/créés. */
+  function applyImport(players, rows, decisions, keepOld, meta) {
+    decisions = decisions || {};
+    keepOld = keepOld || {};
+    meta = meta || {};
+    var date = meta.date || new Date().toISOString();
+    var file = meta.file || '';
+    var work = {};      // copies modifiées
+    var get = function (id) { return work[id] || players[id]; };
+    var view = {};      // vue combinée pour l'index
+    Object.keys(players).forEach(function (id) { view[id] = players[id]; });
+    var idx = buildIndex(view);
+    var report = { items: [], created: 0, completed: 0, updated: 0, unchanged: 0, skipped: 0, toconfirm: 0, conflicts: [] };
+
+    rows.forEach(function (row, i) {
+      var item = { i: i, row: row, status: null, result: null, id: null, candidates: [], changes: [] };
+      report.items.push(item);
+      if (!row.name || !nameKey(row.name)) { item.result = 'skipped'; report.skipped++; return; }
+
+      var m = findMatch(view, idx, row.name, row.club, !!row.unreadable);
+      item.status = m.status;
+      item.candidates = m.candidates;
+      var target = null;
+
+      if (m.status === 'exact') {
+        target = m.id;
+      } else if (m.status === 'new') {
+        target = 'new';
+      } else {
+        var d = decisions[i];
+        if (d === 'new') target = 'new';
+        else if (d === 'skip') { item.result = 'skipped'; report.skipped++; return; }
+        else if (d && view[d]) target = d;
+        else { item.result = 'toconfirm'; report.toconfirm++; return; }
+      }
+
+      var p, isNew = false;
+      if (target === 'new') {
+        isNew = true;
+        p = { id: randomId(meta.chunks), name: String(row.name).trim().replace(/\s+/g, ' '), pos: row.pos || null,
+          club: row.club || null, def: null, atk: null, src: {}, hist: [], created: date };
+        work[p.id] = p;
+        view[p.id] = p;
+        indexAdd(idx, p);
+      } else {
+        if (!work[target]) work[target] = clonePlayer(players[target]);
+        p = work[target];
+        view[target] = p;
+        if (!p.src) p.src = {};
+        if (!p.hist) p.hist = [];
+      }
+      item.id = p.id;
+      item.name = p.name;
+
+      var filled = 0, changed = 0, same = 0;
+      STATS.forEach(function (s) {
+        var v = row[s];
+        if (v == null) return;
+        if (p[s] == null) {
+          p[s] = v; p.src[s] = file; filled++;
+          item.changes.push({ stat: s, old: null, now: v, kind: 'new' });
+        } else if (p[s] === v) {
+          same++;
+        } else if (keepOld[i + ':' + s]) {
+          item.changes.push({ stat: s, old: p[s], now: p[s], offered: v, kind: 'kept' });
+          report.conflicts.push({ i: i, name: p.name, stat: s, old: p[s], now: v, kept: true });
+        } else {
+          p.hist.push({ stat: s, old: p[s], now: v, date: date, src: file });
+          if (p.hist.length > 12) p.hist = p.hist.slice(-12);
+          item.changes.push({ stat: s, old: p[s], now: v, kind: 'changed' });
+          report.conflicts.push({ i: i, name: p.name, stat: s, old: p[s], now: v, kept: false });
+          p[s] = v; p.src[s] = file; changed++;
+        }
+      });
+      if (!p.pos && row.pos) p.pos = row.pos;
+      if (!p.club && row.club) p.club = row.club;
+      p.updated = date;
+
+      if (isNew) { item.result = 'created'; report.created++; }
+      else if (changed) { item.result = 'updated'; report.updated++; }
+      else if (filled) { item.result = 'completed'; report.completed++; }
+      else { item.result = 'unchanged'; report.unchanged++; }
+    });
+
+    report.players = work;
+    return report;
+  }
+
+  /* ---------- Lecture de tableaux ---------- */
+
+  function classifyHeader(cell) {
+    var t = normText(cell);
+    if (!t) return null;
+    var tk = t.split(' ');
+    var has = function (re) { return tk.some(function (x) { return re.test(x); }); };
+    if (/^(prenom|first name|firstname|given name)$/.test(t) || t === 'first') return 'first';
+    if (/^(nom de famille|last name|lastname|surname|family name)$/.test(t) || t === 'last') return 'last';
+    if (/^(nom|nom du joueur|nom joueur|joueur|player|player name|name|footballeur|card|carte|nom complet|full name|joueurs|players)$/.test(t)) return 'name';
+    var d = has(/^(def|dfn|dfs|defense|defence|defending|defensif|defensive)$/);
+    var a = has(/^(atk|att|attack|attaque|attacking|offense|offensif|offensive|off)$/);
+    if (d && !a) return 'def';
+    if (a && !d) return 'atk';
+    if (d && a) return null;
+    if (/^(pos|position|poste|role)$/.test(t)) return 'pos';
+    if (/^(club|equipe|team|squad)$/.test(t)) return 'club';
+    if (/^(rang|rank|classement|place|n|no|num|numero)$/.test(t) || String(cell).trim() === '#') return 'rank';
+    if (/^(score|valeur|value|stat|stats|statistique|points|pts|total|moyenne|avg|average|rating|note|niveau|level|power|puissance)$/.test(t)) return 'value';
+    return null;
+  }
+
+  var JUNK_NAMES = /^(total|moyenne|average|rang|rank|joueur|player|nom|name|classement|top \d+)$/;
+
+  function normPos(s) {
+    if (s == null) return null;
+    var t = normText(s);
+    if (!t) return null;
+    if (/^(gk|gardien|goalkeeper|goal|g)$/.test(t)) return 'GK';
+    if (/^(def|df|defenseur|defender|d|defenseurs)$/.test(t)) return 'DEF';
+    if (/^(mid|mf|milieu|midfielder|m|milieux)$/.test(t)) return 'MID';
+    if (/^(att|atk|fwd|fw|st|attaquant|forward|striker|a|attaquants)$/.test(t)) return 'FWD';
+    var raw = String(s).trim();
+    return raw.length <= 12 ? raw.toUpperCase() : null;
+  }
+
+  function cellStr(c) { return c == null ? '' : String(c).trim(); }
+
+  function looksLikeName(s) {
+    s = cellStr(s);
+    if (!s || s.length < 2) return false;
+    if (!/\p{L}{2,}/u.test(s)) return false;
+    if (/^\d+([.,]\d+)?$/.test(s)) return false;
+    return true;
+  }
+
+  /* rows : tableau de tableaux. hint : 'def' | 'atk' | null (étiquette d'une colonne sans titre). */
+  function parseTable(rows, hint) {
+    var out = { rows: [], notes: [], headerFound: false };
+    var hdrIdx = -1, cols = null, r, c;
+
+    for (r = 0; r < Math.min(rows.length, 30); r++) {
+      var cl = (rows[r] || []).map(classifyHeader);
+      var hasName = cl.indexOf('name') >= 0 || (cl.indexOf('first') >= 0 && cl.indexOf('last') >= 0) || cl.indexOf('last') >= 0;
+      var hasVal = cl.indexOf('def') >= 0 || cl.indexOf('atk') >= 0 || cl.indexOf('value') >= 0;
+      if (hasName && hasVal) { hdrIdx = r; cols = cl; break; }
+    }
+
+    var map = {}; // type -> index
+    if (hdrIdx >= 0) {
+      out.headerFound = true;
+      cols.forEach(function (t, i) { if (t && map[t] == null) map[t] = i; });
+    } else {
+      // Sans titres : on devine les colonnes.
+      var width = 0;
+      rows.forEach(function (row) { if (row && row.length > width) width = row.length; });
+      var info = [];
+      for (c = 0; c < width; c++) {
+        var txt = 0, num = 0, ints = [];
+        rows.forEach(function (row) {
+          var v = row ? row[c] : null;
+          if (cellStr(v) === '') return;
+          if (parseNum(v) != null && /^[\s\d.,+-]+$/.test(cellStr(v))) { num++; ints.push(parseNum(v)); }
+          else if (looksLikeName(v)) txt++;
+        });
+        info.push({ c: c, txt: txt, num: num, ints: ints });
+      }
+      var nameCol = info.slice().sort(function (a, b) { return b.txt - a.txt; })[0];
+      if (!nameCol || nameCol.txt < 1) { out.notes.push('Aucune colonne de noms de joueurs détectée.'); return out; }
+      map.name = nameCol.c;
+      var numCols = info.filter(function (x) { return x.num >= Math.max(1, nameCol.txt * 0.5) && x.c !== nameCol.c; });
+      // colonne de rang : entiers croissants 1..n
+      numCols = numCols.filter(function (x) {
+        var asc = x.ints.length > 2 && x.ints.every(function (v, i) { return v === i + 1 || (i > 0 && v === x.ints[i - 1] + 1); });
+        if (asc && x.c < nameCol.c) { map.rank = x.c; return false; }
+        return true;
+      });
+      if (numCols.length === 1) map.value = numCols[0].c;
+      else if (numCols.length >= 2) {
+        map.value = numCols[0].c;
+        out.notes.push('Plusieurs colonnes de chiffres sans titre : seule la première est utilisée.');
+      }
+      hdrIdx = -1;
+    }
+
+    var start = hdrIdx + 1;
+    var valueHint = hint || null;
+    for (r = start; r < rows.length; r++) {
+      var row = rows[r] || [];
+      var name;
+      if (map.first != null && (map.last != null || map.name != null)) {
+        name = (cellStr(row[map.first]) + ' ' + cellStr(row[map.last != null ? map.last : map.name])).trim();
+      } else if (map.name != null) name = cellStr(row[map.name]);
+      else name = cellStr(row[map.last]);
+      name = name.replace(/^#?\d{1,4}\s*[.)\-:]\s*/, '');
+      if (!name) continue;
+      if (!looksLikeName(name)) continue;
+      if (JUNK_NAMES.test(normText(name))) continue;
+      var rec = { name: name.replace(/\s+/g, ' '), def: null, atk: null, pos: null, club: null };
+      if (map.def != null) rec.def = parseNum(row[map.def]);
+      if (map.atk != null) rec.atk = parseNum(row[map.atk]);
+      if (map.value != null && map.def == null && map.atk == null) {
+        var v = parseNum(row[map.value]);
+        if (v != null) { if (valueHint) rec[valueHint] = v; else rec.unk = v; }
+      }
+      if (map.pos != null) rec.pos = normPos(row[map.pos]);
+      if (map.club != null) rec.club = cellStr(row[map.club]) || null;
+      out.rows.push(rec);
+    }
+    return out;
+  }
+
+  /* Indice DEF/ATK d'après le nom du fichier ou de la feuille. */
+  function detectHint(label) {
+    var t = normText(label);
+    if (!t) return null;
+    var d = /(^| )(def|dfn|defens\w*|defend\w*|defenseur\w*|defenceman)( |$)/.test(t) || /defens|defend/.test(t);
+    var a = /(^| )(atk|att|attaq\w*|attack\w*|offens\w*|striker\w*|forward\w*|fwd)( |$)/.test(t) || /attaq|attack|offens/.test(t);
+    if (d && !a) return 'def';
+    if (a && !d) return 'atk';
+    return null;
+  }
+
+  function resolveUnknown(rows, stat) {
+    rows.forEach(function (r) {
+      if (r.unk != null) { if (r[stat] == null) r[stat] = r.unk; delete r.unk; }
+    });
+    return rows;
+  }
+
+
+  /* ---------- CSV ---------- */
+
+  function parseCSV(text) {
+    text = String(text || '').replace(/^﻿/, '');
+    var first = text.split(/\r?\n/).slice(0, 8).join('\n');
+    var best = ',', bestN = -1;
+    [';', ',', '\t', '|'].forEach(function (d) {
+      var n = first.split(d).length - 1;
+      if (n > bestN) { bestN = n; best = d; }
+    });
+    var rows = [], row = [], cur = '', q = false, i, ch;
+    for (i = 0; i < text.length; i++) {
+      ch = text.charAt(i);
+      if (q) {
+        if (ch === '"') { if (text.charAt(i + 1) === '"') { cur += '"'; i++; } else q = false; }
+        else cur += ch;
+      } else if (ch === '"') q = true;
+      else if (ch === best) { row.push(cur); cur = ''; }
+      else if (ch === '\n' || ch === '\r') {
+        if (ch === '\r' && text.charAt(i + 1) === '\n') i++;
+        row.push(cur); cur = '';
+        if (row.some(function (x) { return x !== ''; })) rows.push(row);
+        row = [];
+      } else cur += ch;
+    }
+    row.push(cur);
+    if (row.some(function (x) { return x !== ''; })) rows.push(row);
+    return rows;
+  }
+
+
+  /* ---------- Exports PDF « Snatch Watch » ---------- */
+
+  /* Reconstruit des lignes de texte à partir des morceaux de texte d'une page PDF (pdf.js). */
+  function pdfItemsToText(items) {
+    var rows = [];
+    items.forEach(function (it) {
+      if (!it.str || !it.str.trim()) return;
+      var x = it.transform[4], y = it.transform[5];
+      var row = rows.filter(function (r) { return Math.abs(r.y - y) < 2.5; })[0];
+      if (!row) { row = { y: y, items: [] }; rows.push(row); }
+      row.items.push({ x: x, str: it.str, w: it.width || 0 });
+    });
+    rows.sort(function (a, b) { return b.y - a.y; });
+    return rows.map(function (r) {
+      r.items.sort(function (a, b) { return a.x - b.x; });
+      var s = '', end = null;
+      r.items.forEach(function (i) {
+        if (end != null) { var gap = i.x - end; s += gap > 8 ? '\t' : (gap > 1 ? ' ' : ''); }
+        s += i.str; end = i.x + i.w;
+      });
+      return s;
+    }).join('\n');
+  }
+
+  var SW_POS = /^(GOALKEEPER|DEFENDER|MIDFIELDER|FORWARD)\s*[·•|]\s*(.+)$/i;
+  var SW_RANK = /^(\d{1,3})\s+(\S.*?)\s+(\d{1,3}(?:[.,]\d+)?)$/;
+  var SW_LIST = /^(\d{1,3}(?:[.,]\d+)?)\s+(\d{1,3}(?:[.,]\d+)?)\s+IR\b/;
+
+  function prettyClub(slug) {
+    var parts = String(slug || '').trim().toLowerCase().split('-').filter(Boolean);
+    if (parts.length % 2 === 0 && parts.length > 0) {
+      var h = parts.length / 2;
+      if (parts.slice(0, h).join('-') === parts.slice(h).join('-')) parts = parts.slice(0, h);
+    }
+    return parts.map(function (p) { return p.charAt(0).toUpperCase() + p.slice(1); }).join(' ') || null;
+  }
+
+  /* Nettoie les éléments d'interface qui se mélangent au texte : bandeau « Snatch Watch · Updated 2d ago »,
+     barre d'onglets « Legendary Goat ATK DEF History », bouton « : », en-tête « Sort by IR … ». */
+  function swCleanLines(text) {
+    var out = [];
+    String(text || '').split(/\r?\n/).forEach(function (raw) {
+      var l = raw.replace(/ /g, ' ').trim();
+      if (!l) return;
+      l = l.replace(/\s*\bUpdated\s+\S+(?:\s+\S+)?\s+ago\b.*$/i, '').trim();
+      if (!l || l === ':' || /^Legendary\b.*\bHistory$/i.test(l) || /^Sort by IR\b/i.test(l) || /^\d+\s+players$/i.test(l)) return;
+      var flags = { snatch: false, watch: false };
+      var m;
+      if ((m = /^Snatch\s*Watch\b\s*(.*)$/i.exec(l))) { l = m[1].trim(); flags.snatch = flags.watch = true; }
+      else if ((m = /^Snatch(?=\p{Lu})(.*)$/u.exec(l))) { l = m[1].trim(); flags.snatch = true; }
+      else if ((m = /^Watch(?=\p{Lu})(.*)$/u.exec(l)) || (m = /^Watch\s+(\S.*)$/.exec(l))) { l = m[1].trim(); flags.watch = true; }
+      else if (/^(Snatch|Watch)$/i.test(l)) return;
+      if (!l) return;
+      out.push({ t: l, snatch: flags.snatch, watch: flags.watch });
+    });
+    // Cas où le bandeau recouvre le nom en le coupant en deux lignes (« SnatchNicolas » / « WatchPépé »)
+    var merged = [];
+    for (var i = 0; i < out.length; i++) {
+      var cur = out[i], nxt = out[i + 1];
+      if (cur.snatch && !cur.watch && nxt && nxt.watch && !SW_POS.test(cur.t) && !SW_POS.test(nxt.t) && !SW_RANK.test(cur.t)) {
+        merged.push(cur.t + ' ' + nxt.t); i++;
+      } else merged.push(cur.t);
+    }
+    return merged;
+  }
+
+  function parseSnatchWatch(text) {
+    var lines = swCleanLines(text);
+    if (!lines.some(function (l) { return SW_POS.test(l); })) return null;
+    var stat = null, declared = null, title = null, m, i;
+    for (i = 0; i < Math.min(lines.length, 12); i++) {
+      if ((m = /^Top\s+(\d+)\s+.*?\bby\s+(defending|attacking)\s*score\b/i.exec(lines[i]))) {
+        declared = parseInt(m[1], 10); stat = /^def/i.test(m[2]) ? 'def' : 'atk'; title = lines[i]; break;
+      }
+    }
+    var rawText = String(text || ''); // « 73 players » est retiré du nettoyage : on le relit ici
+    var pm = /(\d+)\s+players/i.exec(rawText);
+    if (pm && declared == null) declared = parseInt(pm[1], 10);
+
+    var rows = [], skipped = [];
+    for (i = 0; i < lines.length; i++) {
+      var pos = SW_POS.exec(lines[i]);
+      if (!pos) continue;
+      var prev = lines[i - 1] || '', next = lines[i + 1] || '';
+      var rec = { name: null, def: null, atk: null, pos: normPos(pos[1]), club: prettyClub(pos[2]) };
+      var rk = SW_RANK.exec(prev), ls = SW_LIST.exec(next);
+      if (rk && !ls) {
+        rec.name = rk[2].trim();
+        var v = parseNum(rk[3]);
+        if (stat) rec[stat] = v; else rec.unk = v;
+      } else if (ls && !rk) {
+        rec.name = prev.trim();
+        rec.atk = parseNum(ls[1]); rec.def = parseNum(ls[2]); // 1er nombre = ATK, 2e = DEF (vérifié par recoupement avec les classements)
+      } else {
+        skipped.push(prev || '(ligne vide)');
+        continue;
+      }
+      if (!looksLikeName(rec.name)) { skipped.push(rec.name || '(sans nom)'); continue; }
+      rows.push(rec);
+    }
+    var warnings = [];
+    if (declared != null && rows.length !== declared) {
+      warnings.push('Le PDF annonce ' + declared + ' joueurs, mais ' + rows.length + ' ont été lus' + (skipped.length ? ' (non lus : ' + skipped.slice(0, 5).join(', ') + ')' : '') + '. Vérifiez avant d\'enregistrer.');
+    } else if (skipped.length) {
+      warnings.push(skipped.length + ' entrée' + (skipped.length > 1 ? 's' : '') + ' non lue' + (skipped.length > 1 ? 's' : '') + ' : ' + skipped.slice(0, 5).join(', ') + '.');
+    }
+    var notes = ['Export « Snatch Watch » reconnu' + (title ? ' : ' + title : (stat ? '' : ' (liste ATK + DEF)')) + (declared != null ? ' · ' + declared + ' joueurs annoncés, ' + rows.length + ' lus' : '') + '.'];
+    return { rows: rows, notes: notes, warnings: warnings, headerFound: true, format: 'snatch-watch', declared: declared };
+  }
+
+  /* ---------- Texte libre (PDF, copier-coller) ---------- */
+
+  function parseLine(line, hint) {
+    var s = line.replace(/ /g, ' ').trim();
+    if (!s) return null;
+    s = s.replace(/^\s*#?\d{1,4}\s*[.)\-:]?\s+(?=\p{L})/u, '');
+    var rec = { name: null, def: null, atk: null, pos: null, club: null };
+    var labelRe = /\b(def\w*|dfn|atk|att\w*)\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)/gi, m, anyLabel = false;
+    var cleaned = s;
+    while ((m = labelRe.exec(s))) {
+      var lab = normText(m[1]);
+      var st = /^(def|dfn|defen\w*)/.test(lab) ? 'def' : (/^(atk|att|attaq\w*|attack\w*)/.test(lab) ? 'atk' : null);
+      if (st) { rec[st] = parseNum(m[2]); anyLabel = true; }
+    }
+    if (anyLabel) cleaned = s.replace(labelRe, ' ');
+    var nm = cleaned.match(/^\s*([\p{L}][\p{L}'’.\- ]*?)(?=\s+[-\d]|\s*$)/u);
+    if (!nm) return null;
+    rec.name = nm[1].trim();
+    if (!anyLabel) {
+      var rest = cleaned.slice(nm[0].length);
+      var nums = rest.match(/-?\d+(?:[.,]\d+)?/g);
+      if (nums && nums.length) {
+        var v = parseNum(nums[nums.length > 1 ? 1 : 0]);
+        // « 1 Paul Dupont 82 » : si plusieurs nombres, le premier est souvent un rang déjà retiré ; on prend le dernier
+        v = parseNum(nums[nums.length - 1]);
+        if (hint) rec[hint] = v; else rec.unk = v;
+      }
+    }
+    if (!looksLikeName(rec.name) || JUNK_NAMES.test(normText(rec.name))) return null;
+    if (rec.def == null && rec.atk == null && rec.unk == null) return null;
+    return rec;
+  }
+
+  function parseText(text, hint) {
+    var sw = parseSnatchWatch(text);
+    if (sw && sw.rows.length) return sw;
+    var lines = String(text || '').split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+    var splitRows = lines.map(function (l) { return l.split(/\t+| {2,}|\s*[|;]\s*/).map(function (x) { return x.trim(); }).filter(function (x) { return x !== ''; }); });
+    var multi = splitRows.filter(function (a) { return a.length >= 2; }).length;
+    if (multi >= Math.max(3, lines.length * 0.5)) {
+      var t = parseTable(splitRows, hint);
+      if (t.rows.length >= 3) { t.notes.push('Lu comme un tableau.'); return t; }
+    }
+    var rows = [];
+    lines.forEach(function (l) { var r = parseLine(l, hint); if (r) rows.push(r); });
+    return { rows: rows, notes: rows.length ? ['Lu ligne par ligne.'] : [], headerFound: false };
+  }
+
+  /* Réponses de Claude (lecture d'image) → lignes normalisées. */
+  function normalizeAiRows(arr, hint) {
+    var rows = [];
+    if (!Array.isArray(arr)) return rows;
+    arr.forEach(function (o) {
+      if (!o || typeof o !== 'object') return;
+      var name = o.nom != null ? o.nom : (o.name != null ? o.name : null);
+      name = name == null ? '' : String(name).trim();
+      if (!name) return;
+      var rec = {
+        name: name,
+        def: parseNum(o.def != null ? o.def : o.DEF),
+        atk: parseNum(o.atk != null ? o.atk : o.ATK),
+        pos: normPos(o.position != null ? o.position : o.pos),
+        club: o.club ? String(o.club).trim() || null : null
+      };
+      var u = parseNum(o.valeur_inconnue != null ? o.valeur_inconnue : o.unk);
+      if (u != null) { if (hint) { if (rec[hint] == null) rec[hint] = u; } else rec.unk = u; }
+      if (o.lisible === false || o.readable === false) rec.unreadable = true;
+      if (rec.def != null && hint === 'atk' && rec.atk == null) { /* cohérent avec l'indice */ }
+      rows.push(rec);
+    });
+    return rows;
+  }
+
+  /* ---------- Équipe adverse ---------- */
+
+  function matchTeam(players, detected) {
+    var idx = buildIndex(players);
+    return detected.map(function (d, i) {
+      var m = findMatch(players, idx, d.name, d.club, !!d.unreadable);
+      return {
+        key: i, name: d.name, pos: d.pos || null, club: d.club || null,
+        seen: { def: d.def == null ? null : d.def, atk: d.atk == null ? null : d.atk },
+        unreadable: !!d.unreadable,
+        status: m.status, id: m.status === 'exact' ? m.id : null, candidates: m.candidates
+      };
+    });
+  }
+
+  /* ---------- Lecture OCR des noms (sur l'appareil) ----------
+     variants : textes bruts lus par l'OCR pour UNE carte (plusieurs prétraitements).
+     Rapproche du joueur de la base le plus proche. Ne devine jamais : renvoie le meilleur score,
+     le second, et « sure » seulement si l'écart est net. */
+  function matchOcrName(players, variants) {
+    var vts = (variants || []).map(function (v) {
+      return tokens(String(v || '').replace(/[^A-Za-z\u00C0-\u024F]+/g, ' ')).filter(function (t) { return t.length >= 2; });
+    }).filter(function (t) { return t.length; });
+    var raw = (variants || []).map(function (v) { return String(v || '').replace(/[^A-Za-z\u00C0-\u024F' -]+/g, ' ').replace(/\s+/g, ' ').trim(); })
+      .filter(function (t) { return t.replace(/[^A-Za-z]/g, '').length >= 3; }).sort(function (a, b) { return b.length - a.length; })[0] || '';
+    var union = [].concat.apply([], vts);
+    var scored = [];
+    Object.keys(players || {}).forEach(function (id) {
+      var p = players[id], pt = tokens(p.name);
+      if (!pt.length) return;
+      var pk = pt.slice().sort().join(' '), best = 0;
+      function covOf(vt, withFull) {
+        var cov = 0, distinct = false, ext = vt.slice();
+        for (var q = 0; q + 1 < vt.length; q++) ext.push(vt[q] + vt[q + 1]); /* mot coupé par l'OCR : « TA RKOWSKI » */
+        pt.forEach(function (t) {
+          var b = 0;
+          ext.forEach(function (u) { var x = sim(u, t); if (x > b) b = x; });
+          if (b >= 0.6) cov += b;
+          if (t.length >= 7 && b >= (t.length >= 8 ? 0.85 : 0.9)) distinct = true;
+        });
+        cov /= pt.length;
+        var s = Math.max(cov * 0.95, distinct ? 0.9 : 0);
+        if (withFull) s = Math.max(s, sim(vt.slice().sort().join(' '), pk));
+        return s;
+      }
+      vts.forEach(function (vt) { var s = covOf(vt, true); if (s > best) best = s; });
+      if (vts.length > 1) { var s2 = covOf(union, false); if (s2 > best) best = s2; }
+      if (best > 0.4) scored.push({ id: id, name: p.name, score: best });
+    });
+    scored.sort(function (a, b) { return b.score - a.score; });
+    var b1 = scored[0] || null, b2 = scored[1] || null;
+    var margin = b1 ? b1.score - (b2 ? b2.score : 0) : 0;
+    return { text: raw, best: b1, second: b2, margin: margin, sure: !!(b1 && b1.score >= 0.88 && margin >= 0.1), letters: raw.replace(/[^A-Za-z\u00C0-\u024F]/g, '').length };
+  }
+
+  /* ---------- Calculs ---------- */
+
+  function roundPart(x, mode) {
+    if (mode === 'floor') return Math.floor(x + 1e-9);
+    if (mode === 'round') return Math.round(x);
+    if (mode === 'none') return x;
+    return Math.ceil(x - 1e-9);
+  }
+
+  function contribution(value, pct, mode) {
+    if (value == null) return null;
+    return roundPart(value * pct / 100, mode);
+  }
+
+  /* members : [{name, def, atk}] (valeur null = inconnue)
+     opts : { rules, bonus:{def,atk}, club:{def,atk} (null = non confirmé), crit:{def,atk} (null = inconnu), mains:[index] | null } */
+  function calcTeam(members, opts) {
+    var rules = Object.assign({}, DEFAULT_RULES, opts.rules || {});
+    var bonus = opts.bonus || {};
+    var club = opts.club || {};
+    var crit = opts.crit || {};
+    var mains = opts.mains && opts.mains.length ? opts.mains : members.map(function (_, i) { return i; });
+    var result = { rules: rules, size: members.length };
+
+    STATS.forEach(function (s) {
+      var b = bonus[s] == null ? 0 : bonus[s];
+      var cb = club[s]; // null/undefined = non confirmé
+      var clubAdded = cb != null;
+      var cands = mains.map(function (mi) {
+        var lines = members.map(function (p, i) {
+          var isMain = i === mi;
+          var pct = isMain ? rules.mainPct : rules.supportPct;
+          var base = p[s] == null ? null : p[s];
+          return {
+            index: i, name: p.name, role: isMain ? 'principal' : 'support', pct: pct,
+            base: base, contrib: contribution(base, pct, rules.rounding)
+          };
+        });
+        var known = lines.filter(function (l) { return l.contrib != null; });
+        var missing = lines.filter(function (l) { return l.contrib == null; });
+        var subtotal = known.reduce(function (a, l) { return a + l.contrib; }, 0);
+        var mainMissing = lines[mi].contrib == null;
+        var total = subtotal + b + (clubAdded ? cb : 0);
+        var c = crit[s];
+        return {
+          mainIndex: mi, mainName: members[mi].name, lines: lines,
+          subtotal: subtotal, bonus: b, club: clubAdded ? cb : null,
+          total: total, missingCount: missing.length, missingNames: missing.map(function (l) { return l.name; }),
+          mainMissing: mainMissing, complete: missing.length === 0,
+          critTotal: c != null ? total + c : null, crit: c == null ? null : c
+        };
+      });
+      var complete = cands.filter(function (x) { return x.complete; });
+      result[s] = {
+        stat: s, candidates: cands, bonus: b, club: clubAdded ? cb : null,
+        min: complete.length ? Math.min.apply(null, complete.map(function (x) { return x.total; })) : null,
+        max: complete.length ? Math.max.apply(null, complete.map(function (x) { return x.total; })) : null,
+        allComplete: complete.length === cands.length
+      };
+    });
+    return result;
+  }
+
+  /* ---------- Doublons dans la base ---------- */
+
+  function findDuplicates(players) {
+    var ids = Object.keys(players);
+    var keys = ids.map(function (id) { return nameKey(players[id].name); });
+    var groups = [], used = {};
+    for (var i = 0; i < ids.length; i++) {
+      if (used[ids[i]]) continue;
+      var g = [ids[i]];
+      for (var j = i + 1; j < ids.length; j++) {
+        if (used[ids[j]]) continue;
+        var a = keys[i], b = keys[j];
+        var s = a === b ? 1 : sim(a, b);
+        if (s >= 0.88 && !(players[ids[i]].club && players[ids[j]].club && !sameClub(players[ids[i]].club, players[ids[j]].club) && a !== b)) g.push(ids[j]);
+        else if (a === b) g.push(ids[j]);
+      }
+      if (g.length > 1) { g.forEach(function (x) { used[x] = 1; }); groups.push(g); }
+    }
+    return groups;
+  }
+
+  /* Fusionne b dans a : garde les valeurs de a, complète avec celles de b. */
+  function mergePlayers(a, b) {
+    var m = clonePlayer(a);
+    if (!m.src) m.src = {};
+    STATS.forEach(function (s) {
+      if (m[s] == null && b[s] != null) { m[s] = b[s]; m.src[s] = (b.src && b.src[s]) || ''; }
+    });
+    if (!m.pos && b.pos) m.pos = b.pos;
+    if (!m.club && b.club) m.club = b.club;
+    m.updated = new Date().toISOString();
+    return m;
+  }
+
+  var Core = {
+    STATS: STATS, DEFAULT_RULES: DEFAULT_RULES,
+    normText: normText, nameKey: nameKey, sim: sim, parseNum: parseNum,
+    buildIndex: buildIndex, findMatch: findMatch, applyImport: applyImport,
+    parseSnatchWatch: parseSnatchWatch, pdfItemsToText: pdfItemsToText, prettyClub: prettyClub, parseCSV: parseCSV, parseTable: parseTable, parseText: parseText, parseLine: parseLine, detectHint: detectHint,
+    resolveUnknown: resolveUnknown, normalizeAiRows: normalizeAiRows, normPos: normPos,
+    matchTeam: matchTeam, matchOcrName: matchOcrName, calcTeam: calcTeam, contribution: contribution,
+    findDuplicates: findDuplicates, mergePlayers: mergePlayers, randomId: randomId, clonePlayer: clonePlayer
+  };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = Core;
+  else root.Core = Core;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/* ===== Sorare Snatch Calculator — interface ===== */
+(function () {
+  'use strict';
+  var C = window.Core;
+  var STATS = C.STATS;
+  var STAT_LABEL = { def: 'DEF', atk: 'ATK' };
+  var CHUNKS = 48;
+  var LS_KEY = 'snatch.v1';
+
+  /* ---------- Utilitaires ---------- */
+  var $ = function (s, el) { return (el || document).querySelector(s); };
+  var $$ = function (s, el) { return Array.prototype.slice.call((el || document).querySelectorAll(s)); };
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmt(n) {
+    if (n == null) return '—';
+    var r = Math.round(n * 100) / 100;
+    return String(r).replace('.', ',');
+  }
+  function numOrNull(s) {
+    s = String(s == null ? '' : s).trim().replace(',', '.');
+    if (s === '') return null;
+    var n = parseFloat(s);
+    return isFinite(n) ? n : null;
+  }
+  function uid() { return Math.random().toString(36).slice(2, 9); }
+  function plural(n, one, many) { return n + ' ' + (n > 1 ? many : one); }
+  function dateFr(iso) {
+    try {
+      return new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    } catch (e) { return iso || ''; }
+  }
+  function loadScript(url) {
+    return new Promise(function (res, rej) {
+      var s = document.createElement('script');
+      s.src = url; s.onload = res; s.onerror = function () { rej(new Error('Impossible de charger ' + url)); };
+      document.head.appendChild(s);
+    });
+  }
+  function withTimeout(p, ms) {
+    return Promise.race([p, new Promise(function (r) { setTimeout(function () { r(null); }, ms); })]);
+  }
+
+  /* ---------- État ---------- */
+  var S = {
+    tab: 'analyse', ready: false, storage: 'memory', mode: 'browser', note: '',
+    db: { players: {}, imports: [], rules: Object.assign({}, C.DEFAULT_RULES) },
+    sample: null, limits: null,
+    team: { state: 'idle', members: [], err: '', img: null, ctl: null },
+    bonus: { def: '', atk: '', clubDef: '', clubAtk: '', critDef: '', critAtk: '' },
+    mainsOff: {},
+    hintMode: 'auto', jobs: [],
+    q: '', filter: 'all', limit: 60,
+    modal: null, saving: '', saveErr: '', dup: null, confirmReset: false
+  };
+
+  /* ---------- Stockage ---------- */
+  var dbh = null, writeChain = Promise.resolve();
+
+  function lsRead() {
+    try { var r = localStorage.getItem(LS_KEY); return r ? JSON.parse(r) : null; } catch (e) { return null; }
+  }
+  function lsWrite() {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify({ players: S.db.players, imports: S.db.imports, rules: S.db.rules }));
+    } catch (e) { /* stockage local indisponible : sans importance si la base partagée fonctionne */ }
+  }
+  function chunkOf(id) { return 'c' + String(id).slice(0, 2); }
+
+  /* ----- Mode serveur (application hors de Claude) : base et lecture d'images passent par le serveur ----- */
+  var SERVER = !!window.SNATCH_SERVER;
+  /* Mode « local » : tout reste sur l'appareil (base IndexedDB), lecture des images par OCR gratuit sur l'appareil. Aucun serveur, aucune API payante. */
+  var LOCAL = !!window.SNATCH_LOCAL;
+
+  function makeLocalShims() {
+    return new Promise(function (res, rej) {
+      if (!window.indexedDB) return rej(new Error('Stockage de l\'appareil indisponible'));
+      var rq;
+      try { rq = indexedDB.open('snatch-calculator', 1); } catch (e) { return rej(e); }
+      rq.onupgradeneeded = function () { rq.result.createObjectStore('docs'); };
+      rq.onerror = function () { rej(rq.error || new Error('Stockage de l\'appareil indisponible')); };
+      rq.onblocked = function () { rej(new Error('Stockage bloqué par un autre onglet')); };
+      rq.onsuccess = function () {
+        var idb = rq.result;
+        function tx(mode, fn) {
+          return new Promise(function (ok, ko) {
+            var t = idb.transaction('docs', mode), r;
+            t.oncomplete = function () { ok(r && r.result); };
+            t.onerror = t.onabort = function () { ko(t.error || new Error('Écriture refusée')); };
+            r = fn(t.objectStore('docs'));
+          });
+        }
+        try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {}); } catch (e) { /* facultatif */ }
+        res({
+          sample: null,
+          db: {
+            doc: function (p) {
+              return {
+                path: p, id: p.split('/').pop(),
+                get: function () { return tx('readonly', function (st) { return st.get(p); }).then(function (v) { return { id: p.split('/').pop(), exists: v !== undefined, data: function () { return v; } }; }); },
+                set: function (d) { return tx('readwrite', function (st) { return st.put(JSON.parse(JSON.stringify(d)), p); }); },
+                delete: function () { return tx('readwrite', function (st) { return st.delete(p); }); }
+              };
+            },
+            collection: function (p) {
+              return { get: function () {
+                var range = IDBKeyRange.bound(p + '/', p + '/\uffff');
+                return new Promise(function (ok, ko) {
+                  var t = idb.transaction('docs', 'readonly'), docs = [];
+                  var c = t.objectStore('docs').openCursor(range);
+                  c.onsuccess = function () {
+                    var cur = c.result;
+                    if (cur) { (function (k, v) { docs.push({ id: String(k).split('/').pop(), exists: true, data: function () { return v; } }); })(cur.key, cur.value); cur.continue(); }
+                  };
+                  t.oncomplete = function () { ok({ docs: docs, size: docs.length, empty: !docs.length }); };
+                  t.onerror = t.onabort = function () { ko(t.error || new Error('Lecture refusée')); };
+                });
+              } };
+            }
+          }
+        });
+      };
+    });
+  }
+
+  function serverApi(url, opts) {
+    opts = opts || {};
+    return fetch(url, { method: opts.method || 'GET', credentials: 'same-origin', signal: opts.signal,
+      headers: opts.body ? { 'Content-Type': 'application/json' } : undefined, body: opts.body }).then(function (r) {
+      if (r.status === 401) { setTimeout(function () { location.reload(); }, 50); throw { code: 'session_expired', message: 'Session expirée' }; }
+      return r.json().catch(function () { return null; }).then(function (j) {
+        if (!r.ok) throw { code: (j && j.code) || 'upstream_error', message: (j && j.message) || ('Erreur ' + r.status) };
+        return j;
+      });
+    }, function (e) {
+      if (e && e.name === 'AbortError') throw { code: 'cancelled', message: 'Annulé' };
+      throw { code: 'network', message: 'Le serveur ne répond pas. Vérifiez votre connexion.' };
+    });
+  }
+  function blobToServerImage(blob) {
+    return loadBitmap(blob).then(function (bmp) {
+      var w = bmp.width, h = bmp.height, k = Math.min(1, 1568 / Math.max(w, h));
+      var cv = document.createElement('canvas'); cv.width = Math.round(w * k); cv.height = Math.round(h * k);
+      cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+      return canvasBlob(cv);
+    }).then(function (b) {
+      return new Promise(function (res, rej) {
+        var fr = new FileReader();
+        fr.onload = function () { res({ mediaType: 'image/jpeg', data: String(fr.result).split(',')[1] }); };
+        fr.onerror = function () { rej({ code: 'image_rejected', message: 'Image illisible' }); };
+        fr.readAsDataURL(b);
+      });
+    });
+  }
+  function makeServerShims() {
+    return serverApi('/api/status').then(function (st) {
+      var dbShim = {
+        doc: function (p) {
+          return {
+            path: p, id: p.split('/').pop(),
+            get: function () { return serverApi('/api/doc?path=' + encodeURIComponent(p)).then(function (j) { return { id: p.split('/').pop(), exists: j.exists, data: function () { return j.data; } }; }); },
+            set: function (d) { return serverApi('/api/doc?path=' + encodeURIComponent(p), { method: 'PUT', body: JSON.stringify(d) }); },
+            delete: function () { return serverApi('/api/doc?path=' + encodeURIComponent(p), { method: 'DELETE' }); }
+          };
+        },
+        collection: function (p) {
+          return { get: function () {
+            return serverApi('/api/docs?prefix=' + encodeURIComponent(p + '/')).then(function (j) {
+              var docs = j.docs.map(function (d) { return { id: d.path.split('/').pop(), exists: true, data: function () { return d.data; } }; });
+              return { docs: docs, size: docs.length, empty: !docs.length };
+            });
+          } };
+        }
+      };
+      var sample = function () { return Promise.reject({ code: 'upstream_error', message: 'non utilisé' }); };
+      sample.limits = function () { return Promise.resolve({ images: { maxCount: 6, maxInputBytes: 2e7, mediaTypes: ['image/jpeg', 'image/png', 'image/webp'] } }); };
+      sample.json = function (prompt, opts) {
+        opts = opts || {};
+        var imgs = opts.images ? (Array.isArray(opts.images) ? opts.images : [opts.images]) : [];
+        return Promise.all(imgs.map(blobToServerImage)).then(function (list) {
+          return serverApi('/api/ai', { method: 'POST', signal: opts.signal, body: JSON.stringify({ prompt: prompt, images: list }) });
+        }).then(function (j) { return j.json; });
+      };
+      return { db: dbShim, sample: st.ai ? sample : null, ai: st.ai };
+    });
+  }
+
+  function initStorage() {
+    var use = function (n) {
+      if (!window.claude || !window.claude.use) return Promise.resolve(null);
+      return window.claude.use(n).catch(function () { return null; });
+    };
+    var start = LOCAL
+      ? makeLocalShims().then(function (s) { S.mode = 'local'; return [s.db, null]; })
+      : SERVER
+      ? makeServerShims().then(function (s) { S.mode = 'server'; return [s.db, s.sample]; })
+      : Promise.all([use('db'), use('sample')]).then(function (r) { S.mode = r[0] ? 'claude' : 'browser'; return r; });
+    return start.then(function (r) {
+      dbh = r[0]; S.sample = r[1];
+      var p = S.sample && S.sample.limits ? S.sample.limits().catch(function () { return null; }) : Promise.resolve(null);
+      return p;
+    }).then(function (lim) {
+      S.limits = lim;
+      var local = lsRead();
+      if (!dbh) {
+        S.storage = local ? 'local' : 'memory';
+        if (local) { S.db.players = local.players || {}; S.db.imports = local.imports || []; S.db.rules = Object.assign({}, C.DEFAULT_RULES, local.rules || {}); }
+        S.note = 'Les données sont gardées seulement dans ce navigateur, sans sauvegarde durable.';
+        return;
+      }
+      return Promise.all([
+        dbh.collection('p').get(),
+        dbh.doc('meta/imports').get(),
+        dbh.doc('meta/settings').get()
+      ]).then(function (r) {
+        var players = {};
+        r[0].docs.forEach(function (d) { var data = d.data() || {}; Object.assign(players, data.players || {}); });
+        var imports = r[1].exists ? (r[1].data().list || []) : [];
+        var rules = r[2].exists ? (r[2].data().rules || {}) : {};
+        S.storage = 'db';
+        if (!Object.keys(players).length && local && Object.keys(local.players || {}).length) {
+          S.db.players = local.players; S.db.imports = local.imports || []; S.db.rules = Object.assign({}, C.DEFAULT_RULES, local.rules || {});
+          S.note = 'Vos données locales ont été reprises dans la base partagée.';
+          return persist({ all: true, imports: true, rules: true });
+        }
+        S.db.players = players; S.db.imports = imports; S.db.rules = Object.assign({}, C.DEFAULT_RULES, rules);
+      });
+    }).catch(function (e) {
+      var local = lsRead();
+      S.storage = 'local';
+      if (local) { S.db.players = local.players || {}; S.db.imports = local.imports || []; S.db.rules = Object.assign({}, C.DEFAULT_RULES, local.rules || {}); }
+      S.note = LOCAL ? 'Le stockage de cet appareil ne répond pas (' + (e && e.message ? e.message : 'erreur') + '). Les données sont gardées dans ce navigateur seulement : faites une sauvegarde (Réglages).'
+        : SERVER ? 'Le serveur ne répond pas (' + (e && e.message ? e.message : 'erreur') + '). Les données affichées viennent de ce navigateur et ne sont pas enregistrées sur le serveur.'
+        : 'La base partagée ne répond pas (' + (e && e.code ? e.code : 'erreur') + '). Les données sont gardées dans ce navigateur.';
+      dbh = null;
+    });
+  }
+
+  /* Enregistre ce qui a changé. opts : { chunks:Set, all, imports, rules } */
+  function persist(opts) {
+    lsWrite();
+    if (!dbh) return Promise.resolve();
+    S.saving = 'Enregistrement…'; S.saveErr = ''; renderStatus();
+    writeChain = writeChain.then(function () {
+      var jobs = [];
+      var ids = Object.keys(S.db.players);
+      var byChunk = {};
+      var chunkSet = {};
+      if (opts.all) { for (var i = 0; i < CHUNKS; i++) chunkSet['c' + (i < 10 ? '0' : '') + i] = 1; }
+      if (opts.chunks) Object.keys(opts.chunks).forEach(function (c) { chunkSet[c] = 1; });
+      ids.forEach(function (id) { var c = chunkOf(id); if (chunkSet[c]) (byChunk[c] = byChunk[c] || {})[id] = S.db.players[id]; });
+      var seq = Promise.resolve();
+      Object.keys(chunkSet).forEach(function (c) {
+        seq = seq.then(function () {
+          var pl = byChunk[c] || {};
+          if (!Object.keys(pl).length && !opts.all) return dbh.doc('p/' + c).delete();
+          if (!Object.keys(pl).length) return null;
+          return dbh.doc('p/' + c).set({ players: pl });
+        });
+      });
+      if (opts.imports) seq = seq.then(function () { return dbh.doc('meta/imports').set({ list: S.db.imports.slice(0, 200) }); });
+      if (opts.rules) seq = seq.then(function () { return dbh.doc('meta/settings').set({ rules: S.db.rules }); });
+      return seq;
+    }).then(function () {
+      S.saving = ''; renderStatus();
+    }).catch(function (e) {
+      S.saving = ''; S.saveErr = 'Enregistrement impossible (' + (e && (e.message || e.code) ? (e.message || e.code) : 'erreur') + '). Les données restent dans ce navigateur.';
+      renderStatus();
+    });
+    return writeChain;
+  }
+
+  /* ---------- Lecture des fichiers ---------- */
+  function readText(file) {
+    return file.arrayBuffer().then(function (buf) {
+      var t = new TextDecoder('utf-8').decode(buf);
+      if (t.indexOf(String.fromCharCode(65533)) >= 0) { try { t = new TextDecoder('windows-1252').decode(buf); } catch (e) { /* garde utf-8 */ } }
+      return t;
+    });
+  }
+
+  function loadBitmap(blob) {
+    if (window.createImageBitmap) {
+      return createImageBitmap(blob, { imageOrientation: 'from-image' }).catch(function () { return viaImg(blob); });
+    }
+    return viaImg(blob);
+  }
+  function viaImg(blob) {
+    return new Promise(function (res, rej) {
+      var u = URL.createObjectURL(blob), im = new Image();
+      im.onload = function () { res(im); };
+      im.onerror = function () { rej(new Error('Image illisible')); };
+      im.src = u;
+    });
+  }
+  function canvasBlob(cv) {
+    return new Promise(function (res) { cv.toBlob(function (b) { res(b); }, 'image/jpeg', 0.92); });
+  }
+  /* Coupe une image très haute en tranches qui se chevauchent, pour garder les petits caractères lisibles. */
+  function sliceImage(file, maxRatio) {
+    return loadBitmap(file).then(function (bmp) {
+      var w = bmp.width, h = bmp.height;
+      if (h / w <= maxRatio) return [file];
+      var segH = Math.round(w * maxRatio * 0.9), step = Math.round(segH * 0.88);
+      var out = [], y = 0, chain = Promise.resolve();
+      var spans = [];
+      while (true) {
+        if (y + segH >= h) { spans.push([Math.max(0, h - segH), h]); break; }
+        spans.push([y, y + segH]); y += step;
+      }
+      spans.forEach(function (sp) {
+        chain = chain.then(function () {
+          var cv = document.createElement('canvas');
+          cv.width = w; cv.height = sp[1] - sp[0];
+          cv.getContext('2d').drawImage(bmp, 0, sp[0], w, cv.height, 0, 0, w, cv.height);
+          return canvasBlob(cv).then(function (b) { out.push(b); });
+        });
+      });
+      return chain.then(function () { return out; });
+    });
+  }
+
+  function aiErrorText(e) {
+    var c = e && e.code;
+    var map = {
+      not_granted: 'Vous avez refusé l\'utilisation de Claude pour cette application. Autorisez-la pour lire les images.',
+      sampling_disabled: 'Claude n\'est pas disponible pour votre compte.',
+      rate_limited: 'Trop de demandes ou limite d\'utilisation atteinte. Réessayez dans quelques minutes.',
+      session_expired: 'Votre session a expiré. Reconnectez-vous à Claude puis réessayez.',
+      image_rejected: 'Cette image n\'est pas acceptée (type ou taille). Essayez une capture d\'écran PNG ou JPEG.',
+      refused: 'Claude n\'a pas pu traiter cette image.',
+      empty_completion: 'Aucune réponse reçue. Réessayez.',
+      invalid_json: 'La réponse n\'a pas pu être lue. Réessayez.',
+      images_unavailable: 'La lecture d\'images n\'est pas disponible ici.',
+      cancelled: 'Lecture annulée.',
+      prompt_too_large: 'Le fichier est trop volumineux.',
+      no_key: 'La clé API n\'est pas configurée sur le serveur.',
+      bad_key: 'La clé API du serveur est refusée. Vérifiez ANTHROPIC_API_KEY chez l\'hébergeur.',
+      network: 'Le serveur ne répond pas. Vérifiez votre connexion.',
+      ocr_unavailable: 'Le moteur de lecture d\'images (gratuit, libre) n\'a pas pu être téléchargé. Connectez-vous à Internet une première fois : il est ensuite gardé sur l\'appareil.'
+    };
+    return map[c] || ('La lecture a échoué' + (e && e.message ? ' : ' + e.message : '') + '.');
+  }
+  function imagesOK() { return !!(S.sample && S.limits && S.limits.images); }
+  function noImagesMsg() {
+    if (LOCAL) return 'La lecture d\'images sur l\'appareil n\'est pas disponible.';
+    if (S.mode === 'server') return 'La lecture d\'images n\'est pas activée sur le serveur : la clé ANTHROPIC_API_KEY est absente. Ajoutez-la dans les réglages de l\'hébergeur, ou importez un fichier CSV, Excel ou PDF.';
+    return 'La lecture d\'images n\'est pas disponible ici. Ouvrez l\'application depuis Claude, ou importez un fichier CSV, Excel ou PDF.';
+  }
+
+  function pickArray(x) {
+    if (Array.isArray(x)) return x;
+    if (x && typeof x === 'object') {
+      var k = Object.keys(x).filter(function (key) { return Array.isArray(x[key]); })[0];
+      if (k) return x[k];
+    }
+    return [];
+  }
+
+  var JSON_SHAPE_STATS = 'Réponds uniquement avec un tableau JSON, sans autre texte. Chaque entrée : {"nom": string, "position": string|null, "club": string|null, "def": number|null, "atk": number|null, "valeur_inconnue": number|null, "lisible": boolean}.\n' +
+    'Règles strictes :\n' +
+    '- Reprends TOUS les joueurs, dans l\'ordre, sans en sauter ni en inventer.\n' +
+    '- "nom" : recopie exactement (accents compris). Si le nom est coupé, flou ou douteux, mets "lisible": false.\n' +
+    '- Un nombre n\'est renseigné que s\'il est clairement affiché pour ce joueur. Sinon null. Ne calcule rien, ne devine aucun chiffre.\n' +
+    '- Ne mets pas de statistique dans "def" ou "atk" si tu ne peux pas savoir à laquelle elle correspond : mets-la dans "valeur_inconnue".\n' +
+    '- Ignore les rangs, les lignes de titre et les totaux.';
+
+  function hintLine(mode, hint) {
+    if (hint === 'def') return 'Les chiffres de ce classement sont des statistiques de DÉFENSE : mets-les dans "def" et laisse "atk" à null (sauf si une colonne ATK distincte est clairement affichée).';
+    if (hint === 'atk') return 'Les chiffres de ce classement sont des statistiques d\'ATTAQUE : mets-les dans "atk" et laisse "def" à null (sauf si une colonne DEF distincte est clairement affichée).';
+    if (mode === 'both') return 'Le document peut contenir DEF et ATK : utilise les titres de colonnes pour les distinguer.';
+    return 'Déduis s\'il s\'agit de DEF (défense) ou ATK (attaque) à partir du titre ou des colonnes. Si tu n\'en es pas certain, utilise "valeur_inconnue".';
+  }
+
+  function aiStatsFromImages(blobs, mode, hint, ctl) {
+    var max = (S.limits && S.limits.images && S.limits.images.maxCount) || 4;
+    var groups = [];
+    for (var i = 0; i < blobs.length; i += max) groups.push(blobs.slice(i, i + max));
+    var rows = [], seq = Promise.resolve();
+    groups.forEach(function (g) {
+      seq = seq.then(function () {
+        var prompt = 'Tu lis ' + (g.length > 1 ? 'des images successives (qui peuvent se chevaucher : ne répète pas un joueur vu deux fois)' : 'une image') +
+          ' d\'un classement ou d\'un tableau de statistiques de joueurs du jeu Sorare Snatch.\n' + hintLine(mode, hint) + '\n' + JSON_SHAPE_STATS;
+        return S.sample.json(prompt, { images: g, signal: ctl.signal }).then(function (r) {
+          rows = rows.concat(C.normalizeAiRows(pickArray(r), hint));
+        });
+      });
+    });
+    return seq.then(function () { return rows; });
+  }
+
+  function aiStatsFromText(text, mode, hint, ctl) {
+    var prompt = 'Voici le texte extrait d\'un document (classement ou statistiques de joueurs du jeu Sorare Snatch).\n' + hintLine(mode, hint) + '\n' + JSON_SHAPE_STATS + '\n\nTEXTE :\n' + text.slice(0, 200000);
+    return S.sample.json(prompt, { signal: ctl.signal }).then(function (r) { return C.normalizeAiRows(pickArray(r), hint); });
+  }
+
+  function readPdf(file, job, mode, hint) {
+    var base = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+    return (window.pdfjsLib ? Promise.resolve() : loadScript(base + 'pdf.min.js')).then(function () {
+      return window.pdfjsWorker ? null : loadScript(base + 'pdf.worker.min.js').catch(function () { return null; });
+    }).then(function () {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = base + 'pdf.worker.min.js';
+      return file.arrayBuffer();
+    }).then(function (buf) {
+      return window.pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+    }).then(function (pdf) {
+      var texts = [], seq = Promise.resolve();
+      for (var n = 1; n <= pdf.numPages; n++) {
+        (function (pn) {
+          seq = seq.then(function () { return pdf.getPage(pn); }).then(function (pg) { return pg.getTextContent(); })
+            .then(function (tc) { texts.push(C.pdfItemsToText(tc.items)); });
+        })(n);
+      }
+      return seq.then(function () {
+        var text = texts.join('\n');
+        var parsed = C.parseText(text, hint);
+        if (parsed.rows.length >= 3) {
+          parsed.notes.forEach(function (n) { job.notes.push(n); });
+          (parsed.warnings || []).forEach(function (w) { job.warnings.push(w); });
+          job.notes.push('Texte du PDF lu directement (' + pdf.numPages + ' page' + (pdf.numPages > 1 ? 's' : '') + ').');
+          return parsed.rows;
+        }
+        if (S.sample && text.replace(/\s/g, '').length > 80) {
+          job.notes.push('Mise en page complexe : lecture par Claude.');
+          return aiStatsFromText(text, mode, hint, job.ctl);
+        }
+        if (!imagesOK()) return [];
+        job.notes.push('PDF scanné : lecture des pages en image par Claude.');
+        var blobs = [], chain = Promise.resolve();
+        for (var p = 1; p <= Math.min(pdf.numPages, 12); p++) {
+          (function (pn) {
+            chain = chain.then(function () { return pdf.getPage(pn); }).then(function (pg) {
+              var vp0 = pg.getViewport({ scale: 1 }), scale = Math.min(2.5, 1300 / vp0.width);
+              var vp = pg.getViewport({ scale: scale }), cv = document.createElement('canvas');
+              cv.width = vp.width; cv.height = vp.height;
+              return pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise.then(function () { return canvasBlob(cv); });
+            }).then(function (b) { blobs.push(b); });
+          })(p);
+        }
+        return chain.then(function () { return aiStatsFromImages(blobs, mode, hint, job.ctl); });
+      });
+    });
+  }
+
+  function readExcel(file, job, mode, hint) {
+    var url = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    return (window.XLSX ? Promise.resolve() : loadScript(url)).then(function () { return file.arrayBuffer(); }).then(function (buf) {
+      var wb = window.XLSX.read(buf, { type: 'array' });
+      var rows = [];
+      wb.SheetNames.forEach(function (sn) {
+        var data = window.XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: null });
+        var h = hint || C.detectHint(sn);
+        var p = C.parseTable(data, h);
+        if (p.rows.length) job.notes.push('Feuille « ' + sn + ' » : ' + plural(p.rows.length, 'joueur', 'joueurs') + (h ? ' (' + STAT_LABEL[h] + ')' : '') + '.');
+        p.notes.forEach(function (n) { job.notes.push(n); });
+        rows = rows.concat(p.rows);
+      });
+      return rows;
+    });
+  }
+
+  function readJob(job, file) {
+    var ext = (file.name.split('.').pop() || '').toLowerCase();
+    var mode = job.mode;
+    var hint = mode === 'def' || mode === 'atk' ? mode : (mode === 'both' ? null : C.detectHint(file.name));
+    job.hint = hint;
+    var p;
+    if (['xlsx', 'xlsm', 'xls', 'ods'].indexOf(ext) >= 0) { job.kind = 'Excel'; p = readExcel(file, job, mode, hint); }
+    else if (ext === 'pdf') { job.kind = 'PDF'; p = readPdf(file, job, mode, hint); }
+    else if (file.type.indexOf('image/') === 0 || ['png', 'jpg', 'jpeg', 'webp', 'gif', 'heic', 'heif'].indexOf(ext) >= 0) {
+      job.kind = 'Image';
+      if (LOCAL) {
+        p = ocrImageToText(file, job).then(function (t) {
+          var r = C.parseText(t, hint);
+          r.notes.forEach(function (n) { job.notes.push(n); });
+          (r.warnings || []).forEach(function (w) { job.warnings.push(w); });
+          if (r.rows.length) job.warnings.push('Image lue par reconnaissance de texte sur l\'appareil : relisez les noms et les chiffres avant d\'enregistrer. Un PDF, un Excel ou un CSV est toujours plus fiable.');
+          return r.rows;
+        });
+        return p;
+      }
+      if (!imagesOK()) return Promise.reject(new Error(noImagesMsg()));
+      p = sliceImage(file, 1.7).then(function (blobs) {
+        if (blobs.length > 1) job.notes.push('Image haute découpée en ' + blobs.length + ' parties pour une meilleure lecture.');
+        return aiStatsFromImages(blobs, mode, hint, job.ctl);
+      });
+    } else if (ext === 'csv' || ext === 'tsv') {
+      job.kind = 'CSV';
+      p = readText(file).then(function (t) {
+        var r = C.parseTable(C.parseCSV(t), hint);
+        if (!r.rows.length) r = C.parseText(t, hint);
+        r.notes.forEach(function (n) { job.notes.push(n); });
+        return r.rows;
+      });
+    } else if (ext === 'txt' || file.type.indexOf('text/') === 0) {
+      job.kind = 'Texte';
+      p = readText(file).then(function (t) { var r = C.parseText(t, hint); r.notes.forEach(function (n) { job.notes.push(n); }); (r.warnings || []).forEach(function (w) { job.warnings.push(w); }); return r.rows; });
+    } else {
+      return Promise.reject(new Error('Format non pris en charge (' + (ext || file.type || 'inconnu') + '). Utilisez CSV, Excel, PDF ou une image.'));
+    }
+    return p;
+  }
+
+  function startImport(files) {
+    files.forEach(function (file) {
+      var job = { id: uid(), name: file.name, kind: '', status: 'reading', rows: [], notes: [], warnings: [], err: '', mode: S.hintMode, hint: null,
+        decisions: {}, keepOld: {}, saved: null, ctl: new AbortController() };
+      S.jobs.unshift(job);
+      renderTab();
+      readJob(job, file).then(function (rows) {
+        job.rows = rows || [];
+        if (!job.rows.length) { job.status = 'error'; job.err = 'Aucun joueur lisible dans ce fichier.'; }
+        else job.status = 'ready';
+      }).catch(function (e) {
+        job.status = 'error';
+        job.err = e && e.code ? aiErrorText(e) : (e && e.message ? e.message : 'Lecture impossible.');
+      }).then(function () { renderTab(); });
+    });
+  }
+
+  function jobReport(job) {
+    return C.applyImport(S.db.players, job.rows, job.decisions, job.keepOld, { file: job.name, chunks: CHUNKS });
+  }
+
+  function saveJob(job) {
+    var rep = jobReport(job);
+    var chunks = {};
+    Object.keys(rep.players).forEach(function (id) { S.db.players[id] = rep.players[id]; chunks[chunkOf(id)] = 1; });
+    var entry = {
+      id: uid(), date: new Date().toISOString(), name: job.name, kind: job.kind, rows: job.rows.length,
+      created: rep.created, completed: rep.completed, updated: rep.updated, unchanged: rep.unchanged,
+      skipped: rep.skipped + rep.toconfirm, hint: job.hint || null
+    };
+    S.db.imports.unshift(entry);
+    job.saved = entry;
+    persist({ chunks: chunks, imports: true });
+    renderTab();
+  }
+
+  /* ---------- Capture d'écran : équipe adverse ---------- */
+  var TEAM_PROMPT = function (n) {
+    return 'Tu lis une capture d\'écran du jeu Sorare Snatch qui montre l\'équipe adverse.' +
+      (n > 1 ? ' Elle est fournie en ' + n + ' parties qui se chevauchent : c\'est une seule capture, ne compte pas deux fois un joueur vu dans deux parties.' : '') +
+      ' L\'équipe peut contenir 7 joueurs ou plus : ne te limite pas à 7.\n' +
+      'Liste TOUS les joueurs visibles, dans l\'ordre d\'affichage. Réponds uniquement avec un tableau JSON, sans autre texte. Chaque entrée : {"nom": string, "position": string|null, "club": string|null, "def": number|null, "atk": number|null, "lisible": boolean}.\n' +
+      'Règles strictes :\n' +
+      '- "nom" : recopie exactement le nom affiché (accents compris). Si le nom est coupé, flou ou partiellement caché, recopie ce que tu vois et mets "lisible": false. Ne complète jamais un nom de mémoire.\n' +
+      '- "position" et "club" : seulement s\'ils sont visibles pour ce joueur, sinon null.\n' +
+      '- "def" et "atk" : seulement si un nombre est clairement affiché pour ce joueur et étiqueté défense/attaque (DEF/ATK), sinon null. Ne calcule rien.\n' +
+      '- N\'invente aucun joueur.';
+  };
+
+  /* ---------- Lecture d'images sur l'appareil (OCR libre et gratuit, sans compte ni clé) ---------- */
+  var TESS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js';
+  var ocrP = null;
+  function ocrWorker() {
+    if (ocrP) return ocrP;
+    ocrP = (window.Tesseract ? Promise.resolve() : loadScript(TESS_URL)).then(function () {
+      return window.Tesseract.createWorker('eng');
+    }).then(function (w) {
+      return Promise.resolve(w.setParameters && w.setParameters({ tessedit_pageseg_mode: '6' })).then(function () { return w; });
+    }).catch(function (e) { ocrP = null; throw { code: 'ocr_unavailable', message: e && e.message }; });
+    return ocrP;
+  }
+  function ocrText(cv) {
+    return ocrWorker().then(function (w) { return w.recognize(cv); }).then(function (r) { return (r && r.data && r.data.text) || ''; });
+  }
+  function bitmapCanvas(blob, maxSide) {
+    return loadBitmap(blob).then(function (bmp) {
+      var k = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+      var cv = document.createElement('canvas'); cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k);
+      cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+      return cv;
+    });
+  }
+
+  /* Repère les cartes du Lineup Snatch grâce aux bandeaux vert pâle (prix) sous chaque carte. */
+  function findCardStrips(cv) {
+    var W = cv.width, H = cv.height, d = cv.getContext('2d').getImageData(0, 0, W, H).data;
+    function pale(x, y) { var i = (y * W + x) * 4, r = d[i], g = d[i + 1], b = d[i + 2]; return g >= 225 && r >= 200 && g - b >= 35 && g - r >= 8; }
+    var bands = [], cur = null, y;
+    for (y = 0; y < H; y++) {
+      var n = 0;
+      for (var x = 0; x < W; x += 3) if (pale(x, y)) n++;
+      var on = n * 3 >= 0.15 * W;
+      if (on && !cur) cur = { y0: y };
+      if (!on && cur) { cur.y1 = y; bands.push(cur); cur = null; }
+    }
+    if (cur) { cur.y1 = H; bands.push(cur); }
+    bands = bands.filter(function (b) { var h = b.y1 - b.y0; return h >= 0.012 * H && h <= 0.05 * H; });
+    var cards = [];
+    bands.forEach(function (b, bi) {
+      var ya = b.y0 + 4, yb = b.y1 - 5, runs = [], s = -1;
+      for (var x = 0; x <= W; x++) {
+        var ok = x < W && pale(x, ya) && pale(x, yb);
+        if (ok && s < 0) s = x;
+        if (!ok && s >= 0) { if (x - s >= 0.1 * W) runs.push([s, x]); s = -1; }
+      }
+      runs.forEach(function (r) { cards.push({ x0: r[0], x1: r[1], top: b.y0, row: bi }); });
+    });
+    return { cards: cards, W: W, H: H, bands: bands };
+  }
+  /* Ajoute les cartes dont le bandeau est caché (derrière le panneau du bas) : même grille, ligne suivante. */
+  function completeGrid(found) {
+    var cards = found.cards.slice(), cols = [];
+    cards.forEach(function (c) { if (!cols.some(function (k) { return Math.abs(k.x0 - c.x0) < 25; })) cols.push({ x0: c.x0, x1: c.x1 }); });
+    cols.sort(function (a, b) { return a.x0 - b.x0; });
+    var rows = found.bands.length, last = found.bands[rows - 1];
+    if (!rows || !cols.length) return { cards: cards, guessed: 0 };
+    var w = cols[0].x1 - cols[0].x0;
+    var pitch = rows > 1 ? (last.y0 - found.bands[0].y0) / (rows - 1) : w * 1.63;
+    var guessed = 0, top = last.y0 + pitch;
+    while (top - 0.42 * w < found.H - 40 && guessed < 3 * cols.length) {
+      cols.forEach(function (k) { cards.push({ x0: k.x0, x1: k.x1, top: Math.round(top), row: rows, guessed: true }); guessed++; });
+      top += pitch; rows++;
+    }
+    return { cards: cards, guessed: guessed };
+  }
+  function otsu(g) {
+    var h = new Array(256).fill(0), i; for (i = 0; i < g.length; i++) h[g[i]]++;
+    var tot = g.length, sum = 0; for (i = 0; i < 256; i++) sum += i * h[i];
+    var sb = 0, wb = 0, mx = 0, th = 128;
+    for (i = 0; i < 256; i++) { wb += h[i]; if (!wb) continue; var wf = tot - wb; if (!wf) break; sb += i * h[i]; var mb = sb / wb, mf = (sum - sb) / wf, v = wb * wf * (mb - mf) * (mb - mf); if (v > mx) { mx = v; th = i; } }
+    return th;
+  }
+  /* Découpe la zone du nom sous la photo, l'agrandit et la prépare (noir sur blanc) pour la lecture. */
+  function nameCanvas(src, card, mode) {
+    var w = card.x1 - card.x0, y0 = Math.max(0, Math.round(card.top - 0.42 * w)), y1 = Math.min(src.height, Math.round(card.top - 0.03 * w));
+    if (y1 - y0 < 40) return null;
+    var k = 2.5, cw = Math.round(w * k), ch = Math.round((y1 - y0) * k), pad = 20;
+    var cv = document.createElement('canvas'); cv.width = cw + 2 * pad; cv.height = ch + 2 * pad;
+    var cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height);
+    cx.imageSmoothingQuality = 'high';
+    cx.drawImage(src, card.x0, y0, w, y1 - y0, pad, pad, cw, ch);
+    if (mode === 'gray' || mode === 'dark' || mode === 'otsu') {
+      var im = cx.getImageData(pad, pad, cw, ch), p = im.data, g = new Uint8Array(cw * ch), i;
+      for (i = 0; i < g.length; i++) g[i] = (p[i * 4] * 299 + p[i * 4 + 1] * 587 + p[i * 4 + 2] * 114) / 1000;
+      var th = mode === 'dark' ? 90 : mode === 'otsu' ? otsu(g) : -1;
+      for (i = 0; i < g.length; i++) { var v = th < 0 ? g[i] : (g[i] < th ? 0 : 255); p[i * 4] = p[i * 4 + 1] = p[i * 4 + 2] = v; p[i * 4 + 3] = 255; }
+      cx.putImageData(im, pad, pad);
+    }
+    return cv;
+  }
+
+  function analyseScreenshotLocal(file) {
+    var ctl = { cancelled: false }, notes = [];
+    if (S.team.img && S.team.img.url) { try { URL.revokeObjectURL(S.team.img.url); } catch (e) { /* ignore */ } }
+    S.team = { state: 'reading', members: [], err: '', img: { url: URL.createObjectURL(file), name: file.name, file: file }, ctl: { abort: function () { ctl.cancelled = true; } }, progress: 'Préparation de la lecture…' };
+    S.mainsOff = {};
+    renderTab();
+    var stop = function () { if (ctl.cancelled) throw { code: 'cancelled' }; };
+    return bitmapCanvas(file, 3200).then(function (cv) {
+      var found = findCardStrips(cv);
+      if (!found.cards.length) throw { code: 'x', message: 'Je ne reconnais pas cette mise en page (cartes du Lineup Snatch avec leur bandeau de prix). Ajoutez les joueurs à la main avec « Ajouter un joueur ».' };
+      var grid = completeGrid(found), cells = grid.cards;
+      cells.sort(function (a, b) { return a.row - b.row || a.x0 - b.x0; });
+      S.team.progress = 'Chargement du moteur de lecture (première fois seulement)…'; renderTab();
+      var rows = [], skipped = 0, seq = Promise.resolve();
+      cells.forEach(function (card, i) {
+        seq = seq.then(function () {
+          stop();
+          S.team.progress = 'Lecture de la carte ' + (i + 1) + ' sur ' + cells.length + '…'; renderTab();
+          var variants = [], modes = ['dark', 'otsu', 'gray'], m = null, chain = Promise.resolve();
+          modes.forEach(function (mode) {
+            chain = chain.then(function () {
+              if (m && m.sure && m.best.score >= 0.95) return null;
+              var c = nameCanvas(cv, card, mode);
+              if (!c) return null;
+              return ocrText(c).then(function (t) { variants.push(t); m = C.matchOcrName(S.db.players, variants); });
+            });
+          });
+          return chain.then(function () {
+            if (!m) { skipped++; return; }
+            if (m.sure) rows.push({ nom: m.best.name, lisible: true });
+            else if (m.best && m.best.score >= 0.65 && m.margin >= 0.12) rows.push({ nom: m.best.name, lisible: false });
+            else if (!card.guessed && m.letters >= 4) rows.push({ nom: m.text, lisible: false });
+            else skipped++;
+          });
+        });
+      });
+      return seq.then(function () {
+        if (grid.guessed) notes.push('La dernière ligne est partiellement cachée par le bandeau du bas : vérifiez qu\'il ne manque aucun joueur (bouton « Ajouter un joueur »).');
+        return rows;
+      });
+    }).then(function (rows) {
+      var rr = C.normalizeAiRows(rows, null);
+      if (!rr.length) throw { code: 'x', message: 'Aucun nom lisible sur cette capture. Vérifiez que votre base contient des joueurs (onglet Importer), ou ajoutez-les à la main.' };
+      S.team.members = C.matchTeam(S.db.players, rr);
+      S.team.state = 'done'; S.team.notes = notes;
+      if (!Object.keys(S.db.players).length) S.team.err = 'Votre base est vide : importez d\'abord vos fichiers pour que les noms soient reconnus.';
+    }).catch(function (e) {
+      if (e && e.code === 'cancelled') { S.team.state = 'idle'; S.team.err = 'Lecture arrêtée.'; }
+      else { S.team.state = 'error'; S.team.err = e && e.code && e.code !== 'x' ? aiErrorText(e) : (e && e.message) || 'Lecture impossible.'; }
+    }).then(function () { S.team.ctl = null; S.team.progress = ''; renderTab(); });
+  }
+
+  function ocrImageToText(file, job) {
+    return sliceImage(file, 1.7).then(function (blobs) {
+      var out = [], seq = Promise.resolve();
+      blobs.forEach(function (b, i) {
+        seq = seq.then(function () {
+          job.progress = 'Lecture de l\'image' + (blobs.length > 1 ? ' (partie ' + (i + 1) + '/' + blobs.length + ')' : '') + '…'; renderTab();
+          return bitmapCanvas(b, 2400).then(ocrText).then(function (t) { out.push(t); });
+        });
+      });
+      return seq.then(function () { job.progress = ''; return out.join('\n'); });
+    });
+  }
+
+  function analyseScreenshot(file, refresh) {
+    if (LOCAL) { return analyseScreenshotLocal(file); }
+    if (!imagesOK()) {
+      S.team = { state: 'error', members: [], err: noImagesMsg() + ' Vous pouvez aussi ajouter les joueurs à la main avec « Ajouter un joueur ».', img: null, ctl: null };
+      renderTab(); return;
+    }
+    var ctl = new AbortController();
+    if (S.team.img && S.team.img.url) { try { URL.revokeObjectURL(S.team.img.url); } catch (e) { /* ignore */ } }
+    S.team = { state: 'reading', members: [], err: '', img: { url: URL.createObjectURL(file), name: file.name, file: file }, ctl: ctl };
+    S.mainsOff = {};
+    renderTab();
+    sliceImage(file, 1.55).then(function (blobs) {
+      var max = S.limits.images.maxCount || 4;
+      if (blobs.length > max) blobs = blobs.slice(0, max);
+      return S.sample.json(TEAM_PROMPT(blobs.length), { images: blobs, signal: ctl.signal, cache: refresh ? false : true });
+    }).then(function (r) {
+      var rows = C.normalizeAiRows(pickArray(r), null);
+      if (!rows.length) throw { code: 'x', message: 'Aucun joueur détecté sur cette capture. Essayez une capture plus nette, ou ajoutez les joueurs à la main.' };
+      S.team.members = C.matchTeam(S.db.players, rows);
+      S.team.state = 'done';
+    }).catch(function (e) {
+      if (e && e.code === 'cancelled') { S.team.state = 'idle'; S.team.err = 'Lecture arrêtée.'; }
+      else { S.team.state = 'error'; S.team.err = e && e.code && e.code !== 'x' ? aiErrorText(e) : (e && e.message) || 'Lecture impossible.'; }
+    }).then(function () { S.team.ctl = null; renderTab(); });
+  }
+
+  function effStats(m) {
+    var p = m.id ? S.db.players[m.id] : null;
+    var out = { src: {} };
+    STATS.forEach(function (s) {
+      var dbv = p && p[s] != null ? p[s] : null, seen = m.seen && m.seen[s] != null ? m.seen[s] : null;
+      var v = null, src = null;
+      if (m.useSeen && m.useSeen[s] && seen != null) { v = seen; src = 'capture'; }
+      else if (dbv != null) { v = dbv; src = 'base'; }
+      else if (seen != null) { v = seen; src = 'capture'; }
+      out[s] = v; out.src[s] = src;
+      if (dbv != null && seen != null && dbv !== seen) { out.src[s + 'Diff'] = { db: dbv, seen: seen }; }
+    });
+    return out;
+  }
+
+  function teamCalc() {
+    var members = S.team.members.map(function (m) { var e = effStats(m); return { name: m.id && S.db.players[m.id] ? S.db.players[m.id].name : m.name, def: e.def, atk: e.atk }; });
+    var mains = [];
+    S.team.members.forEach(function (m, i) { if (!S.mainsOff[m.key]) mains.push(i); });
+    if (!members.length) return null;
+    var b = S.bonus;
+    return {
+      mains: mains,
+      calc: mains.length ? C.calcTeam(members, {
+        rules: S.db.rules, mains: mains,
+        bonus: { def: numOrNull(b.def), atk: numOrNull(b.atk) },
+        club: { def: numOrNull(b.clubDef), atk: numOrNull(b.clubAtk) },
+        crit: { def: numOrNull(b.critDef), atk: numOrNull(b.critAtk) }
+      }) : null
+    };
+  }
+
+  /* ---------- Rendu : éléments communs ---------- */
+  function chip(stat, v, src) {
+    if (v == null) return '<span class="chip miss" title="Statistique inconnue">' + STAT_LABEL[stat] + ' manquante</span>';
+    return '<span class="chip ' + stat + '">' + STAT_LABEL[stat] + ' <b>' + fmt(v) + '</b>' + (src === 'capture' ? ' <i>capture</i>' : '') + '</span>';
+  }
+  function playerChips(p) {
+    return STATS.map(function (s) { return chip(s, p[s] == null ? null : p[s]); }).join('');
+  }
+  function badge(kind, text) { return '<span class="badge ' + kind + '">' + esc(text) + '</span>'; }
+
+  var ICONS = {
+    analyse: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l2-2.5h6L17 7h3v12H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.4" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>',
+    import: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    players: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 19c.5-3.2 2.8-5 5.5-5s5 1.8 5.5 5M16 6.2a3 3 0 0 1 0 5.6M18 14.3c1.7.6 2.9 2.2 3.2 4.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    settings: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h9m4 0h1M5 17h3m4 0h7M5 12h1m4 0h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>'
+  };
+  var TABS = [['analyse', 'Analyser'], ['import', 'Importer'], ['players', 'Joueurs'], ['settings', 'Réglages']];
+
+  /* ---------- Rendu : Analyser ---------- */
+  function renderAnalyse() {
+    var t = S.team, h = '';
+    h += '<section class="hero"><h1>Équipe adverse</h1>';
+    h += '<p class="sub">Envoyez la capture d\'écran : les joueurs sont reconnus et leurs statistiques sont cherchées dans votre base (' + plural(Object.keys(S.db.players).length, 'joueur', 'joueurs') + ').</p>';
+    h += '<label class="btn primary big" for="shot-input">' + ICONS.analyse + '<span>Envoyer une capture d\'écran</span></label>';
+    h += '<input id="shot-input" type="file" accept="image/*" hidden>';
+    h += '</section>';
+
+    if (t.state === 'reading') {
+      h += '<section class="card busy"><div class="spin" aria-hidden="true"></div><div><b>Lecture de la capture…</b><p class="muted">' + esc(t.progress || 'Cela prend en général 10 à 60 secondes.') + '</p></div><button class="btn ghost" data-act="stop-shot">Arrêter</button></section>';
+    }
+    (t.notes || []).forEach(function (n) { h += '<p class="note warn">' + esc(n) + '</p>'; });
+    if (t.err) h += '<section class="card alert bad"><p>' + esc(t.err) + '</p></section>';
+
+    if (t.img && t.state !== 'idle') {
+      h += '<details class="card shot"><summary>Voir la capture envoyée</summary><img src="' + esc(t.img.url) + '" alt="Capture envoyée"></details>';
+    }
+
+    if (t.members.length || t.state === 'done' || t.state === 'error' || t.state === 'idle') {
+      if (t.members.length) {
+        var unresolved = t.members.filter(function (m) { return !m.id; }).length;
+        h += '<h2 class="sec">' + plural(t.members.length, 'joueur détecté', 'joueurs détectés') + '</h2>';
+        if (unresolved) h += '<p class="note warn">' + plural(unresolved, 'joueur n\'est', 'joueurs ne sont') + ' pas reconnu' + (unresolved > 1 ? 's' : '') + ' avec certitude : leurs statistiques sont comptées comme manquantes tant que vous ne les avez pas confirmés.</p>';
+        h += '<div class="members">' + t.members.map(renderMember).join('') + '</div>';
+      }
+      h += '<div class="row gap"><button class="btn" data-act="add-member">+ Ajouter un joueur</button>' +
+        (t.img && t.state === 'done' ? '<button class="btn ghost" data-act="rerun-shot">Relire la capture</button>' : '') + '</div>';
+    }
+
+    if (t.members.length) {
+      h += renderBonusPanel();
+      h += '<div id="results">' + renderResults() + '</div>';
+    }
+    return h;
+  }
+
+  function renderMember(m) {
+    var p = m.id ? S.db.players[m.id] : null, e = effStats(m);
+    var st = !m.id ? (m.status === 'new' ? badge('bad', 'Inconnu') : badge('warn', 'À confirmer'))
+      : (m.status === 'exact' ? badge('ok', 'Reconnu') : badge('ok', 'Confirmé'));
+    var h = '<article class="member' + (m.id ? '' : ' unres') + '" data-key="' + m.key + '">';
+    h += '<div class="mhead"><div><div class="mname">' + esc(p ? p.name : m.name) + '</div>';
+    var sub = [];
+    if (p && m.name !== p.name) sub.push('lu : « ' + esc(m.name) + ' »');
+    var pos = (p && p.pos) || m.pos, club = (p && p.club) || m.club;
+    if (pos) sub.push(esc(pos)); if (club) sub.push(esc(club));
+    if (sub.length) h += '<div class="msub">' + sub.join(' · ') + '</div>';
+    h += '</div>' + st + '</div>';
+    if (m.unreadable) h += '<p class="note warn small">Nom difficile à lire sur la capture. Vérifiez-le.</p>';
+    h += '<div class="chips">' + STATS.map(function (s) { return chip(s, e[s], e.src[s]); }).join('') + '</div>';
+    STATS.forEach(function (s) {
+      var d = e.src[s + 'Diff'];
+      if (d) {
+        var useSeen = m.useSeen && m.useSeen[s];
+        h += '<p class="note warn small">' + STAT_LABEL[s] + ' : la capture indique ' + fmt(d.seen) + ', la base ' + fmt(d.db) + '. ' +
+          '<button class="link" data-act="toggle-seen" data-key="' + m.key + '" data-stat="' + s + '">' + (useSeen ? 'Utiliser la base (' + fmt(d.db) + ')' : 'Utiliser la capture (' + fmt(d.seen) + ')') + '</button></p>';
+      }
+    });
+    if (!m.id && m.candidates.length) {
+      h += '<div class="cands"><div class="lbl">Est-ce l\'un de ces joueurs ?</div>';
+      m.candidates.forEach(function (c) {
+        var cp = S.db.players[c.id]; if (!cp) return;
+        h += '<button class="cand-btn" data-act="pick-cand" data-key="' + m.key + '" data-id="' + esc(c.id) + '"><span><b>' + esc(cp.name) + '</b>' + (cp.club ? ' · ' + esc(cp.club) : '') + '</span><span class="chips tiny">' + playerChips(cp) + '</span></button>';
+      });
+      h += '</div>';
+    }
+    h += '<div class="mactions">';
+    h += '<button class="btn small" data-act="change-member" data-key="' + m.key + '">' + (m.id ? 'Changer de joueur' : 'Chercher dans la base') + '</button>';
+    h += '<button class="btn small ghost" data-act="rename-member" data-key="' + m.key + '">Corriger le nom lu</button>';
+    h += '<button class="btn small ghost" data-act="remove-member" data-key="' + m.key + '">Retirer</button>';
+    h += '</div>';
+    h += '<label class="check"><input type="checkbox" data-field="main" data-key="' + m.key + '"' + (S.mainsOff[m.key] ? '' : ' checked') + '><span>Peut être le joueur principal</span></label>';
+    h += '</article>';
+    return h;
+  }
+
+  function renderBonusPanel() {
+    var b = S.bonus;
+    function f(id, label, val, ph, hint) {
+      return '<label class="field"><span>' + label + '</span><input id="b-' + id + '" data-field="bonus" data-name="' + id + '" type="text" inputmode="decimal" autocomplete="off" placeholder="' + ph + '" value="' + esc(val) + '">' + (hint ? '<small>' + hint + '</small>' : '') + '</label>';
+    }
+    var h = '<section class="card"><h2 class="sec in">Bonus</h2><p class="muted small">Le nombre saisi est ajouté tel quel au total. Laissez vide s\'il n\'y en a pas.</p>';
+    h += '<div class="grid2">' + f('def', 'Bonus DEF (+)', b.def, '0', '') + f('atk', 'Bonus ATK (+)', b.atk, '0', '') + '</div>';
+    h += '<div class="grid2">' + f('clubDef', 'Bonus de club DEF', b.clubDef, 'vide = non confirmé', 'Ajouté seulement si rempli') + f('clubAtk', 'Bonus de club ATK', b.clubAtk, 'vide = non confirmé', 'Ajouté seulement si rempli') + '</div>';
+    h += '<details class="more"><summary>Critique (aléatoire, facultatif)</summary><p class="muted small">Les critiques sont aléatoires : elles ne sont jamais incluses dans le total. Si vous connaissez leur valeur, elle est affichée à part.</p>';
+    h += '<div class="grid2">' + f('critDef', 'Critique DEF (+)', b.critDef, 'inconnu', '') + f('critAtk', 'Critique ATK (+)', b.critAtk, 'inconnu', '') + '</div></details>';
+    h += '<p class="muted small">Compétences des cartes : non calculées, leur effet n\'est pas confirmé. Si vous en connaissez un, ajoutez-le dans le bonus.</p></section>';
+    return h;
+  }
+
+  function renderResults() {
+    var r = teamCalc();
+    if (!r) return '';
+    if (!r.calc) return '<section class="card alert warn"><p>Cochez au moins un joueur qui peut être le joueur principal.</p></section>';
+    var rules = r.calc.rules;
+    var h = '<h2 class="sec">Résultat</h2>';
+    h += '<p class="muted small rule">Règle : principal ' + fmt(rules.mainPct) + ' %, chaque support ' + fmt(rules.supportPct) + ' %, ' +
+      ({ ceil: 'arrondi à l\'entier supérieur', round: 'arrondi à l\'entier le plus proche', floor: 'arrondi à l\'entier inférieur', none: 'sans arrondi' }[rules.rounding]) + ' pour chaque support. ' +
+      plural(r.calc.size, 'joueur', 'joueurs') + ' dans l\'équipe.</p>';
+    STATS.forEach(function (s) { h += renderStatResult(s, r.calc[s]); });
+    return h;
+  }
+
+  function renderStatResult(s, res) {
+    var L = STAT_LABEL[s];
+    var cands = res.candidates.slice().sort(function (a, b) {
+      if (a.mainMissing !== b.mainMissing) return a.mainMissing ? 1 : -1;
+      return b.total - a.total;
+    });
+    var h = '<section class="card stat ' + s + '"><header class="shead"><h3>' + (s === 'def' ? 'Défense' : 'Attaque') + ' adverse</h3>';
+    var headline;
+    if (res.min == null) headline = '<span class="big warn">incomplet</span>';
+    else if (res.min === res.max) headline = '<span class="big">' + fmt(res.min) + '</span>';
+    else headline = '<span class="big">' + fmt(res.min) + ' <small>à</small> ' + fmt(res.max) + '</span>';
+    h += headline + '</header>';
+    var anyMissing = cands.some(function (c) { return !c.complete; });
+    if (anyMissing) {
+      var names = {};
+      cands.forEach(function (c) { c.missingNames.forEach(function (n) { names[n] = 1; }); });
+      h += '<p class="note warn">Statistique ' + L + ' manquante pour : ' + Object.keys(names).map(esc).join(', ') + '. Les totaux marqués « au moins » ne comptent pas ces joueurs.</p>';
+    }
+    h += '<div class="cl">';
+    cands.forEach(function (c, i) {
+      var open = i === 0 && cands.length <= 3 ? ' open' : '';
+      var tot = c.mainMissing ? '<span class="tot warn">impossible</span>' : '<span class="tot">' + (c.complete ? '' : '<small>au moins </small>') + fmt(c.total) + '</span>';
+      h += '<details class="cand"' + open + '><summary><span>Principal : <b>' + esc(c.mainName) + '</b></span>' + tot + '</summary>';
+      if (c.mainMissing) h += '<p class="note warn small">' + esc(c.mainName) + ' n\'a pas de ' + L + ' connue : impossible de calculer ce cas.</p>';
+      h += '<div class="tw"><table><thead><tr><th>Joueur</th><th>Base</th><th>Part</th></tr></thead><tbody>';
+      c.lines.forEach(function (l) {
+        var raw = l.base == null ? null : l.base * l.pct / 100;
+        var part = l.contrib == null ? '<span class="warn">manquante</span>' :
+          (Math.abs(raw - l.contrib) > 1e-9 ? fmt(raw) + ' → <b>' + fmt(l.contrib) + '</b>' : '<b>' + fmt(l.contrib) + '</b>');
+        h += '<tr class="' + l.role + '"><td>' + esc(l.name) + '<small>' + (l.role === 'principal' ? 'principal' : 'support') + ' · ' + fmt(l.pct) + '\u00a0%</small></td><td>' + (l.base == null ? '—' : fmt(l.base)) + '</td><td>' + part + '</td></tr>';
+      });
+      h += '</tbody><tfoot>';
+      h += '<tr><td colspan="2">Sous-total</td><td>' + fmt(c.subtotal) + '</td></tr>';
+      h += '<tr><td colspan="2">Bonus ' + L + '</td><td>+ ' + fmt(c.bonus) + '</td></tr>';
+      h += '<tr><td colspan="2">Bonus de club</td><td>' + (c.club == null ? '<span class="muted">non confirmé, pas ajouté</span>' : '+ ' + fmt(c.club)) + '</td></tr>';
+      h += '<tr class="total"><td colspan="2">Total ' + L + (c.complete ? '' : ' (minimum)') + '</td><td>' + fmt(c.total) + '</td></tr>';
+      if (c.critTotal != null) h += '<tr class="crit"><td colspan="2">Si critique (aléatoire, à part) : +' + fmt(c.crit) + '</td><td>' + fmt(c.critTotal) + '</td></tr>';
+      h += '</tfoot></table></div></details>';
+    });
+    h += '</div></section>';
+    return h;
+  }
+
+  /* ---------- Rendu : Importer ---------- */
+  function renderImport() {
+    var h = '<section class="hero"><h1>Importer des statistiques</h1>';
+    h += '<p class="sub">Classements ou tableaux en CSV, Excel, PDF ou image. Un fichier peut ne contenir que la défense ou que l\'attaque : les joueurs sont complétés, jamais écrasés.</p>';
+    h += '<div class="seg" role="group" aria-label="Type de classement">';
+    [['auto', 'Auto'], ['def', 'DEF'], ['atk', 'ATK'], ['both', 'DEF + ATK']].forEach(function (o) {
+      h += '<button class="segb' + (S.hintMode === o[0] ? ' on' : '') + '" data-act="hint" data-v="' + o[0] + '">' + o[1] + '</button>';
+    });
+    h += '</div><p class="muted small">« Auto » repère DEF ou ATK d\'après les titres ou le nom du fichier. Si ce n\'est pas clair, l\'application vous le demande.</p>';
+    h += '<label class="btn primary big" for="file-input">' + ICONS.import + '<span>Choisir des fichiers</span></label>';
+    h += '<input id="file-input" type="file" multiple accept=".csv,.tsv,.txt,.xlsx,.xls,.xlsm,.ods,.pdf,image/*" hidden>';
+    h += '</section>';
+    h += '<details class="card more"><summary>Coller du texte</summary><label class="field"><span>Un joueur par ligne, par exemple « Paul Dupont 82 »</span><textarea id="paste-text" rows="5" placeholder="1. Paul Dupont   82"></textarea></label><button class="btn" data-act="paste-go">Lire ce texte</button></details>';
+    if (S.jobs.length) h += '<h2 class="sec">En cours</h2>' + S.jobs.map(renderJob).join('');
+    h += '<h2 class="sec">Historique des imports</h2>';
+    if (!S.db.imports.length) h += '<p class="muted">Aucun import pour l\'instant.</p>';
+    else h += '<ul class="hist">' + S.db.imports.slice(0, 40).map(function (i) {
+      return '<li><div><b>' + esc(i.name) + '</b><small>' + dateFr(i.date) + ' · ' + esc(i.kind || '') + (i.hint ? ' · ' + STAT_LABEL[i.hint] : '') + '</small></div><div class="hc">' +
+        plural(i.rows, 'ligne', 'lignes') + '<small>' + i.created + ' nouveaux · ' + i.completed + ' complétés' + (i.updated ? ' · ' + i.updated + ' modifiés' : '') + (i.skipped ? ' · ' + i.skipped + ' ignorés' : '') + '</small></div></li>';
+    }).join('') + '</ul>';
+    return h;
+  }
+
+  function renderJob(job) {
+    var h = '<article class="card job" data-job="' + job.id + '"><header class="jh"><div><b>' + esc(job.name) + '</b><small>' + esc(job.kind) + (job.hint ? ' · lu comme ' + STAT_LABEL[job.hint] : '') + '</small></div>' +
+      '<button class="x" data-act="job-close" data-job="' + job.id + '" aria-label="Retirer">×</button></header>';
+    if (job.status === 'reading') {
+      return h + '<div class="busy inline"><div class="spin" aria-hidden="true"></div><span>' + esc(job.progress || 'Lecture en cours…') + '</span><button class="btn small ghost" data-act="job-stop" data-job="' + job.id + '">Arrêter</button></div></article>';
+    }
+    if (job.status === 'error') return h + '<p class="note bad">' + esc(job.err) + '</p></article>';
+    (job.warnings || []).forEach(function (w) { h += '<p class="note warn small">' + esc(w) + '</p>'; });
+    job.notes.slice(0, 6).forEach(function (n) { h += '<p class="muted small">' + esc(n) + '</p>'; });
+
+    if (job.saved) {
+      var s = job.saved;
+      return h + '<p class="note ok">Enregistré : ' + plural(s.created, 'nouveau joueur', 'nouveaux joueurs') + ', ' + plural(s.completed, 'joueur complété', 'joueurs complétés') + (s.updated ? ', ' + plural(s.updated, 'valeur modifiée', 'valeurs modifiées') : '') + (s.unchanged ? ', ' + s.unchanged + ' déjà à jour' : '') + (s.skipped ? ', ' + s.skipped + ' ignoré' + (s.skipped > 1 ? 's' : '') : '') + '.</p></article>';
+    }
+
+    var hasUnk = job.rows.some(function (r) { return r.unk != null; });
+    if (hasUnk) {
+      return h + '<div class="note warn"><p><b>Ces chiffres sont-ils de la défense ou de l\'attaque ?</b> Le fichier ne le dit pas, et rien n\'est enregistré tant que vous n\'avez pas choisi.</p>' +
+        '<div class="row gap"><button class="btn" data-act="unk" data-job="' + job.id + '" data-stat="def">C\'est la DÉFENSE</button><button class="btn" data-act="unk" data-job="' + job.id + '" data-stat="atk">C\'est l\'ATTAQUE</button></div></div></article>';
+    }
+
+    var rep = jobReport(job);
+    h += '<div class="chips sum">' +
+      '<span class="chip ok"><b>' + rep.created + '</b> nouveaux</span>' +
+      '<span class="chip ok"><b>' + rep.completed + '</b> complétés</span>' +
+      (rep.updated ? '<span class="chip warnc"><b>' + rep.updated + '</b> modifiés</span>' : '') +
+      (rep.unchanged ? '<span class="chip"><b>' + rep.unchanged + '</b> déjà à jour</span>' : '') +
+      (rep.toconfirm ? '<span class="chip warnc"><b>' + rep.toconfirm + '</b> à confirmer</span>' : '') +
+      (rep.skipped ? '<span class="chip"><b>' + rep.skipped + '</b> ignorés</span>' : '') + '</div>';
+    var nStatRows = { def: 0, atk: 0 };
+    job.rows.forEach(function (r) { STATS.forEach(function (s) { if (r[s] != null) nStatRows[s]++; }); });
+    h += '<p class="muted small">' + job.rows.length + ' lignes lues · DEF : ' + nStatRows.def + ' · ATK : ' + nStatRows.atk + '. Les statistiques absentes du fichier restent vides.</p>';
+
+    var confirms = rep.items.filter(function (it) { return it.status === 'confirm'; });
+    if (confirms.length) {
+      h += '<div class="note warn"><p><b>À confirmer (' + confirms.length + ')</b> : le nom lu peut correspondre à plusieurs joueurs. Rien n\'est choisi au hasard.</p>';
+      confirms.forEach(function (it) {
+        var dec = job.decisions[it.i];
+        h += '<div class="confirm"><div class="clabel">Lu : <b>' + esc(it.row.name) + '</b> ' + STATS.map(function (s) { return it.row[s] != null ? '<span class="chip ' + s + ' tiny">' + STAT_LABEL[s] + ' ' + fmt(it.row[s]) + '</span>' : ''; }).join('') + (it.row.unreadable ? ' <span class="badge warn">illisible</span>' : '') + '</div><div class="opts">';
+        it.candidates.forEach(function (c) {
+          var cp = S.db.players[c.id]; if (!cp) return;
+          h += '<button class="opt' + (dec === c.id ? ' on' : '') + '" data-act="decide" data-job="' + job.id + '" data-i="' + it.i + '" data-v="' + esc(c.id) + '">' + esc(cp.name) + (cp.club ? ' · ' + esc(cp.club) : '') + ' <small>' + playerChipsText(cp) + '</small></button>';
+        });
+        h += '<button class="opt' + (dec === 'new' ? ' on' : '') + '" data-act="decide" data-job="' + job.id + '" data-i="' + it.i + '" data-v="new">Nouveau joueur</button>';
+        h += '<button class="opt' + (dec === 'skip' ? ' on' : '') + '" data-act="decide" data-job="' + job.id + '" data-i="' + it.i + '" data-v="skip">Ignorer</button>';
+        h += '</div></div>';
+      });
+      h += '</div>';
+    }
+    if (rep.conflicts.length) {
+      h += '<div class="note warn"><p><b>Valeurs différentes de celles déjà enregistrées (' + rep.conflicts.length + ')</b> : la nouvelle valeur remplace l\'ancienne, sauf si vous gardez l\'ancienne.</p>';
+      rep.conflicts.forEach(function (c) {
+        h += '<div class="conf"><span>' + esc(c.name) + ' · ' + STAT_LABEL[c.stat] + ' ' + fmt(c.old) + ' → ' + fmt(c.now) + '</span><button class="btn small ' + (c.kept ? '' : 'ghost') + '" data-act="keep" data-job="' + job.id + '" data-i="' + c.i + '" data-stat="' + c.stat + '">' + (c.kept ? 'Ancienne gardée' : 'Garder ' + fmt(c.old)) + '</button></div>';
+      });
+      h += '</div>';
+    }
+    h += '<details class="more"><summary>Voir les ' + job.rows.length + ' lignes lues</summary><ul class="rows">' + rep.items.map(function (it) {
+      var lbl = { created: 'nouveau', completed: 'complété', updated: 'modifié', unchanged: 'à jour', skipped: 'ignoré', toconfirm: 'à confirmer' }[it.result] || '';
+      return '<li><span>' + esc(it.row.name) + '</span><span class="chips tiny">' + STATS.map(function (s) { return it.row[s] != null ? '<span class="chip ' + s + '">' + STAT_LABEL[s] + ' ' + fmt(it.row[s]) + '</span>' : ''; }).join('') + '<em>' + lbl + '</em></span></li>';
+    }).join('') + '</ul></details>';
+    var ready = rep.created + rep.completed + rep.updated + rep.unchanged;
+    h += '<div class="row gap"><button class="btn primary big" data-act="job-save" data-job="' + job.id + '">Enregistrer dans la base</button></div>';
+    if (rep.toconfirm) h += '<p class="muted small">Les ' + rep.toconfirm + ' joueur' + (rep.toconfirm > 1 ? 's' : '') + ' à confirmer seront ignorés si vous enregistrez maintenant.</p>';
+    return h + '</article>';
+  }
+  function playerChipsText(p) {
+    return STATS.map(function (s) { return STAT_LABEL[s] + ' ' + (p[s] == null ? '—' : fmt(p[s])); }).join(' · ');
+  }
+
+  /* ---------- Rendu : Joueurs ---------- */
+  function filteredPlayers() {
+    var q = C.normText(S.q), list = Object.keys(S.db.players).map(function (id) { return S.db.players[id]; });
+    if (q) {
+      var qt = q.split(' ');
+      list = list.filter(function (p) { var n = C.normText(p.name + ' ' + (p.club || '')); return qt.every(function (t) { return n.indexOf(t) >= 0; }); });
+    }
+    if (S.filter === 'nodef') list = list.filter(function (p) { return p.def == null; });
+    else if (S.filter === 'noatk') list = list.filter(function (p) { return p.atk == null; });
+    else if (S.filter === 'full') list = list.filter(function (p) { return p.def != null && p.atk != null; });
+    list.sort(function (a, b) { return C.normText(a.name) < C.normText(b.name) ? -1 : 1; });
+    return list;
+  }
+
+  function renderPlayerList() {
+    var list = filteredPlayers(), h = '';
+    if (!Object.keys(S.db.players).length) return '<p class="muted pad">Aucun joueur pour l\'instant. Importez un classement dans l\'onglet « Importer ».</p>';
+    if (!list.length) return '<p class="muted pad">Aucun joueur ne correspond.</p>';
+    h += '<ul class="plist">' + list.slice(0, S.limit).map(function (p) {
+      return '<li><button class="prow" data-act="edit-player" data-id="' + esc(p.id) + '"><span class="pn"><b>' + esc(p.name) + '</b><small>' + [p.pos, p.club].filter(Boolean).map(esc).join(' · ') + '</small></span><span class="chips tiny">' + playerChips(p) + '</span></button></li>';
+    }).join('') + '</ul>';
+    if (list.length > S.limit) h += '<button class="btn" data-act="more-players">Afficher plus (' + (list.length - S.limit) + ' restants)</button>';
+    return h;
+  }
+
+  function renderPlayers() {
+    var all = Object.keys(S.db.players).map(function (id) { return S.db.players[id]; });
+    var nd = all.filter(function (p) { return p.def == null; }).length, na = all.filter(function (p) { return p.atk == null; }).length;
+    var h = '<section class="hero"><h1>Joueurs enregistrés</h1><p class="sub">' + plural(all.length, 'joueur', 'joueurs') + ' · ' + nd + ' sans DEF · ' + na + ' sans ATK</p>';
+    h += '<input id="q" class="search" type="search" placeholder="Rechercher un joueur ou un club" value="' + esc(S.q) + '" autocomplete="off">';
+    h += '<div class="seg small" role="group">';
+    [['all', 'Tous'], ['nodef', 'Sans DEF'], ['noatk', 'Sans ATK'], ['full', 'Complets']].forEach(function (o) {
+      h += '<button class="segb' + (S.filter === o[0] ? ' on' : '') + '" data-act="filter" data-v="' + o[0] + '">' + o[1] + '</button>';
+    });
+    h += '</div><div class="row gap"><button class="btn" data-act="new-player">+ Nouveau joueur</button><button class="btn ghost" data-act="dups">Chercher les doublons</button></div></section>';
+    if (S.dup) h += renderDups();
+    h += '<div id="plist">' + renderPlayerList() + '</div>';
+    return h;
+  }
+
+  function renderDups() {
+    var h = '<section class="card"><h2 class="sec in">Doublons possibles</h2>';
+    if (!S.dup.length) return h + '<p class="muted">Aucun doublon trouvé.</p><button class="btn ghost" data-act="dups-close">Fermer</button></section>';
+    S.dup.forEach(function (g, gi) {
+      h += '<div class="dupg">' + g.map(function (id) { var p = S.db.players[id]; return p ? '<div class="dp"><span><b>' + esc(p.name) + '</b><small>' + esc(p.club || '') + '</small></span><span class="chips tiny">' + playerChips(p) + '</span></div>' : ''; }).join('') +
+        '<button class="btn small" data-act="merge" data-g="' + gi + '">Fusionner (garder le premier)</button></div>';
+    });
+    return h + '<button class="btn ghost" data-act="dups-close">Fermer</button></section>';
+  }
+
+  /* ---------- Rendu : Réglages ---------- */
+  function renderSettings() {
+    var r = S.db.rules;
+    var h = '<section class="hero"><h1>Réglages</h1><p class="sub">Les règles de calcul sont ici : changez-les si le jeu évolue avec les rebirths.</p></section>';
+    h += '<section class="card"><h2 class="sec in">Règle de calcul</h2>';
+    h += '<div class="grid2"><label class="field"><span>Joueur principal (%)</span><input id="r-main" type="text" inputmode="decimal" value="' + esc(r.mainPct) + '"></label>' +
+      '<label class="field"><span>Chaque support (%)</span><input id="r-sup" type="text" inputmode="decimal" value="' + esc(r.supportPct) + '"></label></div>';
+    h += '<label class="field"><span>Arrondi de chaque support</span><select id="r-round">' + [['ceil', 'À l\'entier supérieur (règle actuelle)'], ['round', 'À l\'entier le plus proche'], ['floor', 'À l\'entier inférieur'], ['none', 'Sans arrondi']].map(function (o) { return '<option value="' + o[0] + '"' + (r.rounding === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>';
+    h += '<div class="row gap"><button class="btn primary" data-act="save-rules">Enregistrer la règle</button><button class="btn ghost" data-act="reset-rules">Remettre 100 % / 25 %</button></div>';
+    h += '<p class="muted small">Le nombre de joueurs n\'est pas limité : tous les joueurs détectés sont comptés, avec la même règle.</p></section>';
+    h += '<section class="card"><h2 class="sec in">Sauvegarde</h2><p class="muted small">' + (S.storage === 'db' ? (S.mode === 'local' ? 'Vos données sont enregistrées sur cet appareil, dans le stockage de l\'application : rien n\'est envoyé à un serveur. Faites une sauvegarde de temps en temps (ci-dessous) : si vous effacez les données du navigateur, elles disparaissent.' : S.mode === 'server' ? 'Vos données sont enregistrées dans la base du serveur : elles restent après fermeture et sur tous vos appareils.' : 'Vos données sont enregistrées dans l\'application et restent après fermeture.') : esc(S.note || 'Les données sont gardées seulement dans ce navigateur.')) + '</p>';
+    h += '<div class="row gap"><button class="btn" data-act="export">Exporter la base (fichier)</button><label class="btn ghost" for="backup-input">Restaurer une sauvegarde</label><input id="backup-input" type="file" accept=".json,application/json" hidden></div></section>';
+    if (S.mode === 'server') h += '<section class="card"><h2 class="sec in">Session</h2><a class="btn ghost" href="/logout">Se déconnecter</a></section>';
+    h += '<section class="card"><h2 class="sec in">Effacer</h2>';
+    if (!S.confirmReset) h += '<button class="btn danger" data-act="reset-ask">Effacer toute la base…</button>';
+    else h += '<p class="note bad">Tous les joueurs et l\'historique seront supprimés. Cette action est définitive.</p><div class="row gap"><button class="btn danger" data-act="reset-do">Oui, tout effacer</button><button class="btn ghost" data-act="reset-no">Annuler</button></div>';
+    h += '</section>';
+    return h;
+  }
+
+  /* ---------- Fenêtres ---------- */
+  function renderModal() {
+    var m = S.modal, box = $('#modal');
+    if (!m) { box.innerHTML = ''; box.hidden = true; return; }
+    box.hidden = false;
+    var h = '<div class="scrim" data-act="modal-close"></div><div class="sheet" role="dialog" aria-modal="true">';
+    if (m.type === 'pick') {
+      h += '<h2>' + esc(m.title) + '</h2><input id="pick-q" class="search" type="search" placeholder="Nom ou club" autocomplete="off" value="' + esc(m.q || '') + '"><div id="pick-list">' + pickList(m) + '</div><button class="btn ghost" data-act="modal-close">Annuler</button>';
+    } else if (m.type === 'rename') {
+      h += '<h2>Corriger le nom lu</h2><label class="field"><span>Nom du joueur</span><input id="rn" type="text" value="' + esc(m.value) + '" autocomplete="off"></label><div class="row gap"><button class="btn primary" data-act="rename-ok">Relancer la recherche</button><button class="btn ghost" data-act="modal-close">Annuler</button></div>';
+    } else if (m.type === 'edit') {
+      var p = m.player;
+      h += '<h2>' + (m.isNew ? 'Nouveau joueur' : 'Fiche du joueur') + '</h2>';
+      h += '<label class="field"><span>Nom</span><input id="e-name" type="text" value="' + esc(p.name) + '" autocomplete="off"></label>';
+      h += '<div class="grid2"><label class="field"><span>Position</span><input id="e-pos" type="text" value="' + esc(p.pos || '') + '"></label><label class="field"><span>Club</span><input id="e-club" type="text" value="' + esc(p.club || '') + '"></label></div>';
+      h += '<div class="grid2"><label class="field"><span>DEF</span><input id="e-def" type="text" inputmode="decimal" value="' + (p.def == null ? '' : esc(p.def)) + '" placeholder="inconnue"></label><label class="field"><span>ATK</span><input id="e-atk" type="text" inputmode="decimal" value="' + (p.atk == null ? '' : esc(p.atk)) + '" placeholder="inconnue"></label></div>';
+      h += '<p class="muted small">Laissez vide si la statistique est inconnue : elle pourra être complétée plus tard par un import.</p>';
+      if (p.src && (p.src.def || p.src.atk)) h += '<p class="muted small">Sources : ' + [p.src.def ? 'DEF ← ' + esc(p.src.def) : '', p.src.atk ? 'ATK ← ' + esc(p.src.atk) : ''].filter(Boolean).join(' · ') + '</p>';
+      if (p.hist && p.hist.length) h += '<details class="more"><summary>Historique des changements</summary><ul class="rows">' + p.hist.slice().reverse().map(function (x) { return '<li><span>' + STAT_LABEL[x.stat] + ' ' + fmt(x.old) + ' → ' + fmt(x.now) + '</span><em>' + dateFr(x.date) + '</em></li>'; }).join('') + '</ul></details>';
+      h += '<div class="row gap"><button class="btn primary" data-act="edit-save">Enregistrer</button><button class="btn ghost" data-act="modal-close">Annuler</button></div>';
+      if (!m.isNew) h += m.confirmDel ? '<p class="note bad">Supprimer ce joueur de la base ?</p><div class="row gap"><button class="btn danger" data-act="edit-del-do">Oui, supprimer</button><button class="btn ghost" data-act="edit-del-no">Non</button></div>' : '<button class="btn danger ghostd" data-act="edit-del">Supprimer ce joueur</button>';
+    }
+    h += '</div>';
+    box.innerHTML = h;
+    var q = $('#pick-q'); if (q) q.focus();
+  }
+
+  function pickList(m) {
+    var q = C.normText(m.q || ''), qt = q ? q.split(' ') : [];
+    var list = Object.keys(S.db.players).map(function (id) { return S.db.players[id]; });
+    if (qt.length) list = list.filter(function (p) { var n = C.normText(p.name + ' ' + (p.club || '')); return qt.every(function (t) { return n.indexOf(t) >= 0; }); });
+    list.sort(function (a, b) { return C.normText(a.name) < C.normText(b.name) ? -1 : 1; });
+    if (!list.length) return '<p class="muted pad">Aucun joueur trouvé dans la base.</p>';
+    return '<ul class="plist">' + list.slice(0, 40).map(function (p) {
+      return '<li><button class="prow" data-act="pick-do" data-id="' + esc(p.id) + '"><span class="pn"><b>' + esc(p.name) + '</b><small>' + [p.pos, p.club].filter(Boolean).map(esc).join(' · ') + '</small></span><span class="chips tiny">' + playerChips(p) + '</span></button></li>';
+    }).join('') + '</ul>' + (list.length > 40 ? '<p class="muted small pad">Affinez la recherche pour voir les autres.</p>' : '');
+  }
+
+  /* ---------- Rendu général ---------- */
+  function renderStatus() {
+    var el = $('#status'); if (!el) return;
+    var txt = S.saving || S.saveErr || '';
+    el.textContent = txt; el.className = 'status' + (S.saveErr ? ' bad' : '');
+  }
+  function renderTab() {
+    var v = $('#view'); if (!v) return;
+    var y = window.scrollY;
+    var html = '';
+    if (!S.ready) html = '<div class="boot"><div class="spin"></div><p>Chargement de votre base…</p></div>';
+    else if (S.tab === 'analyse') html = renderAnalyse();
+    else if (S.tab === 'import') html = renderImport();
+    else if (S.tab === 'players') html = renderPlayers();
+    else html = renderSettings();
+    if (S.ready && S.note && S.storage !== 'db' && S.tab === 'analyse') html = '<p class="note warn small">' + esc(S.note) + '</p>' + html;
+    v.innerHTML = html;
+    $$('.tabbar button').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === S.tab); b.setAttribute('aria-current', b.getAttribute('data-tab') === S.tab ? 'page' : 'false'); });
+    renderStatus();
+    window.scrollTo(0, y);
+  }
+
+  /* ---------- Actions ---------- */
+  function closeModal() { S.modal = null; renderModal(); }
+  function memberByKey(k) { return S.team.members.filter(function (m) { return String(m.key) === String(k); })[0]; }
+  function nextKey() { return S.team.members.reduce(function (a, m) { return Math.max(a, m.key + 1); }, 0); }
+
+  function exportBackup() {
+    var data = JSON.stringify({ app: 'sorare-snatch-calculator', version: 1, date: new Date().toISOString(), players: S.db.players, imports: S.db.imports, rules: S.db.rules }, null, 1);
+    var use = window.claude && window.claude.use ? window.claude.use('downloads') : Promise.resolve(null);
+    use.catch(function () { return null; }).then(function (dl) {
+      if (dl) return dl.save({ filename: 'sauvegarde-snatch-' + new Date().toISOString().slice(0, 10) + '.json', data: data });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' })); a.download = 'sauvegarde-snatch.json'; a.click();
+    }).catch(function () { /* refusé par l'utilisateur */ });
+  }
+
+  function restoreBackup(file) {
+    readText(file).then(function (t) {
+      var d = JSON.parse(t);
+      if (!d || typeof d.players !== 'object') throw new Error('Fichier de sauvegarde non reconnu.');
+      var n = 0;
+      Object.keys(d.players).forEach(function (id) { if (!S.db.players[id]) { S.db.players[id] = d.players[id]; n++; } });
+      (d.imports || []).forEach(function (i) { if (!S.db.imports.some(function (x) { return x.id === i.id; })) S.db.imports.push(i); });
+      S.db.imports.sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+      persist({ all: true, imports: true });
+      S.note = 'Sauvegarde restaurée : ' + n + ' joueur' + (n > 1 ? 's' : '') + ' ajouté' + (n > 1 ? 's' : '') + ' (les joueurs déjà présents sont conservés).';
+      S.restoreMsg = S.note;
+      renderTab();
+    }).catch(function (e) { S.note = 'Restauration impossible : ' + e.message; renderTab(); });
+  }
+
+  function onClick(ev) {
+    var el = ev.target.closest('[data-act],[data-tab]');
+    if (!el) return;
+    if (el.hasAttribute('data-tab')) { S.tab = el.getAttribute('data-tab'); renderTab(); window.scrollTo(0, 0); return; }
+    var act = el.getAttribute('data-act'), d = el.dataset, m, job;
+    switch (act) {
+      case 'stop-shot': if (S.team.ctl) S.team.ctl.abort(); break;
+      case 'rerun-shot': if (S.team.img && S.team.img.file) analyseScreenshot(S.team.img.file, true); break;
+      case 'add-member':
+        S.modal = { type: 'pick', title: 'Ajouter un joueur', q: '', target: 'add' }; renderModal(); break;
+      case 'change-member':
+        m = memberByKey(d.key); S.modal = { type: 'pick', title: 'Choisir le joueur', q: m ? m.name : '', target: d.key }; renderModal(); break;
+      case 'rename-member':
+        m = memberByKey(d.key); S.modal = { type: 'rename', key: d.key, value: m ? m.name : '' }; renderModal(); break;
+      case 'remove-member':
+        S.team.members = S.team.members.filter(function (x) { return String(x.key) !== String(d.key); }); renderTab(); break;
+      case 'pick-cand':
+        m = memberByKey(d.key); if (m) { m.id = d.id; m.status = 'manual'; } renderTab(); break;
+      case 'toggle-seen':
+        m = memberByKey(d.key); if (m) { m.useSeen = m.useSeen || {}; m.useSeen[d.stat] = !m.useSeen[d.stat]; } renderTab(); break;
+      case 'pick-do':
+        if (S.modal && S.modal.type === 'pick') {
+          if (S.modal.target === 'add') {
+            var pl = S.db.players[d.id];
+            S.team.members.push({ key: nextKey(), name: pl.name, pos: pl.pos, club: pl.club, seen: { def: null, atk: null }, unreadable: false, status: 'manual', id: pl.id, candidates: [] });
+            if (S.team.state === 'idle' || S.team.state === 'error') { S.team.state = 'done'; S.team.err = ''; }
+          } else { m = memberByKey(S.modal.target); if (m) { m.id = d.id; m.status = 'manual'; } }
+        }
+        closeModal(); renderTab(); break;
+      case 'rename-ok':
+        var val = ($('#rn') || {}).value || '';
+        m = memberByKey(S.modal.key);
+        if (m && val.trim()) {
+          var mm = C.matchTeam(S.db.players, [{ name: val.trim(), club: m.club }])[0];
+          m.name = val.trim(); m.unreadable = false; m.status = mm.status; m.id = mm.status === 'exact' ? mm.id : null; m.candidates = mm.candidates;
+        }
+        closeModal(); renderTab(); break;
+      case 'modal-close': closeModal(); break;
+      case 'hint': S.hintMode = d.v; renderTab(); break;
+      case 'paste-go':
+        var txt = ($('#paste-text') || {}).value || '';
+        if (txt.trim()) startImport([new File([txt], 'texte collé.txt', { type: 'text/plain' })]);
+        break;
+      case 'job-close': S.jobs = S.jobs.filter(function (j) { if (j.id === d.job && j.ctl) j.ctl.abort(); return j.id !== d.job; }); renderTab(); break;
+      case 'job-stop': job = S.jobs.filter(function (j) { return j.id === d.job; })[0]; if (job && job.ctl) job.ctl.abort(); break;
+      case 'unk':
+        job = S.jobs.filter(function (j) { return j.id === d.job; })[0]; if (job) { C.resolveUnknown(job.rows, d.stat); job.hint = d.stat; } renderTab(); break;
+      case 'decide':
+        job = S.jobs.filter(function (j) { return j.id === d.job; })[0];
+        if (job) { if (job.decisions[d.i] === d.v) delete job.decisions[d.i]; else job.decisions[d.i] = d.v; }
+        renderTab(); break;
+      case 'keep':
+        job = S.jobs.filter(function (j) { return j.id === d.job; })[0];
+        if (job) { var kk = d.i + ':' + d.stat; if (job.keepOld[kk]) delete job.keepOld[kk]; else job.keepOld[kk] = true; }
+        renderTab(); break;
+      case 'job-save': job = S.jobs.filter(function (j) { return j.id === d.job; })[0]; if (job) saveJob(job); break;
+      case 'filter': S.filter = d.v; S.limit = 60; renderTab(); break;
+      case 'more-players': S.limit += 100; $('#plist').innerHTML = renderPlayerList(); break;
+      case 'edit-player': S.modal = { type: 'edit', player: C.clonePlayer(S.db.players[d.id]), isNew: false }; renderModal(); break;
+      case 'new-player': S.modal = { type: 'edit', player: { id: C.randomId(CHUNKS), name: '', pos: null, club: null, def: null, atk: null, src: {}, hist: [] }, isNew: true }; renderModal(); break;
+      case 'edit-save': saveEdit(); break;
+      case 'edit-del': S.modal.confirmDel = true; renderModal(); break;
+      case 'edit-del-no': S.modal.confirmDel = false; renderModal(); break;
+      case 'edit-del-do':
+        var did = S.modal.player.id, cs = {}; cs[chunkOf(did)] = 1;
+        delete S.db.players[did]; persist({ chunks: cs }); closeModal(); renderTab(); break;
+      case 'dups': S.dup = C.findDuplicates(S.db.players); renderTab(); break;
+      case 'dups-close': S.dup = null; renderTab(); break;
+      case 'merge':
+        var g = S.dup[+d.g]; if (!g) break;
+        var keep = S.db.players[g[0]], cs2 = {}; cs2[chunkOf(g[0])] = 1;
+        g.slice(1).forEach(function (id) { keep = C.mergePlayers(keep, S.db.players[id]); cs2[chunkOf(id)] = 1; delete S.db.players[id]; });
+        S.db.players[g[0]] = keep; persist({ chunks: cs2 });
+        S.dup = C.findDuplicates(S.db.players); renderTab(); break;
+      case 'save-rules': {
+        var mp = numOrNull($('#r-main').value), sp = numOrNull($('#r-sup').value);
+        if (mp == null || sp == null || mp < 0 || sp < 0) { S.note = 'Entrez des pourcentages valides.'; break; }
+        S.db.rules = { mainPct: mp, supportPct: sp, rounding: $('#r-round').value };
+        persist({ rules: true }); S.note = ''; renderTab(); toast('Règle enregistrée'); break;
+      }
+      case 'reset-rules': S.db.rules = Object.assign({}, C.DEFAULT_RULES); persist({ rules: true }); renderTab(); toast('Règle remise à 100 % / 25 %'); break;
+      case 'export': exportBackup(); break;
+      case 'reset-ask': S.confirmReset = true; renderTab(); break;
+      case 'reset-no': S.confirmReset = false; renderTab(); break;
+      case 'reset-do':
+        S.db.players = {}; S.db.imports = []; S.confirmReset = false; S.team.members = [];
+        persist({ all: true, imports: true }).then(function () {
+          if (dbh) { var seq = Promise.resolve(); for (var i = 0; i < CHUNKS; i++) (function (c) { seq = seq.then(function () { return dbh.doc('p/c' + (c < 10 ? '0' : '') + c).delete(); }); })(i); return seq; }
+        }).catch(function () { /* ignore */ });
+        renderTab(); toast('Base effacée'); break;
+    }
+  }
+
+  function saveEdit() {
+    var m = S.modal, p = m.player;
+    var name = $('#e-name').value.trim();
+    if (!name) { toast('Entrez un nom'); return; }
+    var def = numOrNull($('#e-def').value), atk = numOrNull($('#e-atk').value);
+    var date = new Date().toISOString();
+    if (!p.hist) p.hist = []; if (!p.src) p.src = {};
+    if (!m.isNew) {
+      var old = S.db.players[p.id];
+      [['def', def], ['atk', atk]].forEach(function (x) {
+        if (old[x[0]] !== x[1]) { p.hist.push({ stat: x[0], old: old[x[0]], now: x[1], date: date, src: 'correction manuelle' }); p.src[x[0]] = x[1] == null ? '' : 'saisie manuelle'; }
+      });
+    } else {
+      if (def != null) p.src.def = 'saisie manuelle'; if (atk != null) p.src.atk = 'saisie manuelle';
+      p.created = date;
+    }
+    p.name = name; p.pos = $('#e-pos').value.trim() || null; p.club = $('#e-club').value.trim() || null; p.def = def; p.atk = atk; p.updated = date;
+    S.db.players[p.id] = p;
+    var cs = {}; cs[chunkOf(p.id)] = 1; persist({ chunks: cs });
+    closeModal(); renderTab(); toast('Joueur enregistré');
+  }
+
+  var toastTimer = null;
+  function toast(msg) {
+    var t = $('#toast'); t.textContent = msg; t.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.hidden = true; }, 2200);
+  }
+
+  function onInput(ev) {
+    var el = ev.target;
+    if (el.id === 'q') { S.q = el.value; S.limit = 60; $('#plist').innerHTML = renderPlayerList(); return; }
+    if (el.id === 'pick-q' && S.modal) { S.modal.q = el.value; $('#pick-list').innerHTML = pickList(S.modal); return; }
+    if (el.getAttribute('data-field') === 'bonus') {
+      S.bonus[el.getAttribute('data-name')] = el.value;
+      var r = $('#results'); if (r) r.innerHTML = renderResults();
+    }
+  }
+  function onChange(ev) {
+    var el = ev.target;
+    if (el.id === 'shot-input' && el.files && el.files[0]) { analyseScreenshot(el.files[0], false); el.value = ''; }
+    else if (el.id === 'file-input' && el.files && el.files.length) { startImport(Array.prototype.slice.call(el.files)); el.value = ''; }
+    else if (el.id === 'backup-input' && el.files && el.files[0]) { restoreBackup(el.files[0]); el.value = ''; }
+    else if (el.getAttribute('data-field') === 'main') {
+      var k = el.getAttribute('data-key');
+      if (el.checked) delete S.mainsOff[k]; else S.mainsOff[k] = true;
+      var r = $('#results'); if (r) r.innerHTML = renderResults();
+    }
+  }
+
+  /* ---------- Démarrage ---------- */
+  function boot() {
+    document.addEventListener('click', onClick);
+    document.addEventListener('input', onInput);
+    document.addEventListener('change', onChange);
+    renderTab();
+    initStorage().then(function () { S.ready = true; renderTab(); }).catch(function () { S.ready = true; renderTab(); });
+  }
+  window.SnatchApp = { S: S, C: C, startImport: startImport, saveJob: saveJob, jobReport: jobReport, renderTab: renderTab, analyseScreenshot: analyseScreenshot, teamCalc: teamCalc, effStats: effStats, boot: boot };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+
+</script>
+</body></html>
