@@ -300,6 +300,38 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
 .newslist b { font-size: 16px; }
 .newslist .ntext { font-size: 14px; color: var(--muted); line-height: 1.45; overflow-wrap: anywhere; }
 
+/* Blocs repliables */
+.fold { padding: 0; overflow: hidden; }
+.foldhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 14px 16px; background: none; border: 0; color: var(--ink); font: inherit; text-align: left; cursor: pointer; min-height: 56px; }
+.foldhead > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.foldhead b { font-size: 17px; }
+.foldhead small { overflow-wrap: anywhere; }
+.foldhead .chev { width: 24px; height: 24px; flex: none; color: var(--accent); transition: transform .2s; }
+.foldhead[aria-expanded="true"] .chev { transform: rotate(180deg); }
+.foldbody { padding: 0 16px 16px; }
+.mocks { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 12px; }
+.mocks figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+.mocks svg { width: 100%; max-width: 150px; height: auto; }
+.mocks figcaption { font-size: 13px; color: var(--muted); text-align: center; line-height: 1.3; }
+.mocks figcaption b { display: block; color: var(--ink); font-size: 14px; }
+.steps { margin: 0 0 10px; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; font-size: 15px; line-height: 1.4; }
+.news .newslist { margin-top: 0; }
+@media (prefers-reduced-motion: reduce) { .foldhead .chev { transition: none; } }
+
+/* Capture à côté des joueurs */
+.pinwrap { position: relative; }
+.shotbtn { margin-block: 4px 10px; }
+.shotpin { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--surface); border: 1.5px solid var(--accent); border-radius: 14px; padding: 8px; margin-block: 6px 12px; box-shadow: 0 8px 24px rgba(0,0,0,.22); }
+.shotbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.shotbar span { display: flex; gap: 6px; }
+.shotscroll { overflow: auto; height: 32vh; margin-top: 6px; border-radius: 10px; background: var(--surface2); touch-action: pan-x pan-y pinch-zoom; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.shotpin.tall .shotscroll { height: 60vh; }
+.shotscroll img { display: block; width: 100%; height: auto; }
+.mhead .mtxt { flex: 1; min-width: 0; }
+.mthumb { flex: none; width: 62px; padding: 0; border: 1.5px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface2); cursor: zoom-in; align-self: flex-start; }
+.mthumb img { display: block; width: 100%; height: auto; }
+.cropbig { display: block; width: 100%; max-width: 280px; height: auto; margin: 4px auto 10px; border-radius: 12px; border: 1.5px solid var(--line); }
+
 </style></head><body>
 <header class="top"><div class="brand">Mon <span>calculateur</span></div><div id="status" class="status" role="status"></div></header>
 <main id="view"></main>
@@ -1425,10 +1457,49 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   /* ----- Mode serveur (application hors de Claude) : base et lecture d'images passent par le serveur ----- */
   var SERVER = !!window.SNATCH_SERVER;
   /* Mode « local » : tout reste sur l'appareil (base IndexedDB), lecture des images par OCR gratuit sur l'appareil. Aucun serveur, aucune API payante. */
-  var BUILD = '04/10 17:46';
+  var BUILD = '04/10 18:11';
+  /* Blocs repliables (Nouveautés, exemple de capture) : le choix est gardé sur l'appareil */
+  function uiGet(key, def) {
+    try { var o = JSON.parse(localStorage.getItem('snatch.ui') || '{}'); if (o && typeof o[key] === 'boolean') return o[key]; } catch (e) { /* ignore */ }
+    return def;
+  }
+  function uiSet(key, val) {
+    try { var o = JSON.parse(localStorage.getItem('snatch.ui') || '{}') || {}; o[key] = !!val; localStorage.setItem('snatch.ui', JSON.stringify(o)); } catch (e) { /* ignore */ }
+  }
+  var CHEVRON = '<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  /* Exemple « comment faire la capture » en haut d'Analyser et de Duel */
+  function mockPhone(kind) {
+    var cardW = 26, cardH = 30, x0 = 17, y0 = 30, gx = 4, gy = 8, svg = '';
+    svg += '<rect x="6" y="4" width="108" height="142" rx="12" fill="var(--surface)" stroke="var(--ink)" stroke-width="2"/>';
+    svg += '<rect x="44" y="8" width="32" height="5" rx="2.5" fill="var(--ink)" opacity=".75"/>';
+    if (kind === 'profile') svg += '<rect x="11" y="20" width="98" height="120" rx="6" fill="none" stroke="#d9a900" stroke-width="3"/>';
+    else svg += '<rect x="30" y="19" width="60" height="6" rx="3" fill="var(--ink)" opacity=".55"/>';
+    for (var r = 0; r < 3; r++) for (var c = 0; c < 3; c++) {
+      var x = x0 + c * (cardW + gx), y = y0 + r * (cardH + gy);
+      svg += '<rect x="' + x + '" y="' + y + '" width="' + cardW + '" height="' + cardH + '" rx="3" fill="var(--surface2)" stroke="var(--line)" stroke-width="1.2"/>';
+      svg += '<circle cx="' + (x + cardW / 2) + '" cy="' + (y + 10) + '" r="5" fill="var(--muted)" opacity=".45"/>';
+      svg += '<rect x="' + (x + 4) + '" y="' + (y + 19) + '" width="' + (cardW - 8) + '" height="4" rx="2" fill="var(--ink)" opacity=".7"/>';
+      if (kind === 'lineup') svg += '<rect x="' + x + '" y="' + (y + cardH + 1.5) + '" width="' + cardW + '" height="5" rx="2" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width=".8"/>';
+    }
+    return '<svg viewBox="0 0 120 150" role="img" aria-label="' + (kind === 'lineup' ? 'Schéma d\'un Lineup : cartes avec leur prix en dessous' : 'Schéma d\'une page de profil : cartes dans un cadre jaune') + '">' + svg + '</svg>';
+  }
+  function howtoCard(who) {
+    var open = uiGet('howto', true);
+    var h = '<section class="card fold howto"><button class="foldhead" data-act="ui-toggle" data-key="howto" aria-expanded="' + open + '"><span><b>Comment faire la capture ?</b><small>Un exemple de ce qu\'il faut envoyer</small></span>' + CHEVRON + '</button>';
+    if (open) {
+      h += '<div class="foldbody"><div class="mocks"><figure>' + mockPhone('lineup') + '<figcaption><b>Le Lineup</b>les cartes avec leur prix en dessous</figcaption></figure><figure>' + mockPhone('profile') + '<figcaption><b>La page de profil</b>les cartes dans le cadre jaune</figcaption></figure></div>';
+      h += '<ol class="steps"><li>Ouvrez ' + (who === 'mine' ? 'votre équipe' : 'l\'équipe adverse') + ' dans Sorare : le <b>Lineup</b> ou la <b>page de profil</b>.</li><li>Vérifiez que <b>toutes les cartes</b> sont visibles en entier, avec leur nom.</li><li>Faites la capture d\'écran (bouton latéral + volume haut sur iPhone).</li><li>Envoyez-la ici, puis contrôlez les noms, les fonds et les compétences lus.</li></ol>';
+      h += '<p class="muted small">Le fond de l\'écran (couleur, image) n\'a aucune importance. Ne rognez pas la capture. Si une carte est cachée par un bandeau, ajoutez le joueur à la main.</p></div>';
+    }
+    return h + '</section>';
+  }
+
   /* Historique des mises à jour (affiché dans Réglages) : une ligne simple par amélioration, la plus récente en premier.
      À compléter à chaque nouvelle version. */
   var NEWS = [
+    { when: '4 octobre', title: 'La capture à côté des joueurs', text: 'Chaque joueur affiche la miniature de sa carte telle qu\'elle est sur votre capture (touchez-la pour l\'agrandir). Le bouton « Voir la capture à côté des joueurs » épingle la capture en haut de l\'écran pendant que vous faites défiler la liste, pour repérer les erreurs.' },
+    { when: '4 octobre', title: 'Exemple pour faire la capture', text: 'En haut d\'Analyser et de Duel, un schéma montre quelle capture envoyer. Vous pouvez le replier, comme l\'encart Nouveautés : votre choix est gardé.' },
     { when: '4 octobre', title: 'Noms de joueurs mieux lus', text: 'Une liste d\'environ 51 000 joueurs aide l\'application à corriger un nom mal lu sur une capture, même si le joueur n\'est pas dans votre base. Leurs statistiques ne changent pas.' },
     { when: '4 octobre', title: 'Capture de profil et de lineup, quel que soit le fond', text: 'L\'équipe se lit aussi bien depuis le Lineup que depuis la page de profil, avec n\'importe quelle couleur de fond. Dans Duel, vous pouvez envoyer la capture de votre propre équipe.' },
     { when: '4 octobre', title: 'Compétences comme dans le jeu', text: 'Les compétences (Attacker, Captain, On Fire…) sont ajoutées à la carte avant le calcul 100 % / 25 %. Cela corrige l\'écart de 1 à 2 points avec le jeu.' },
@@ -1986,6 +2057,19 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     Object.keys(tot).forEach(function (c) { var p = tot[c] / nt; if (!best || p > best.p) best = { key: c, p: p }; });
     return best;
   }
+  /* Miniature de la carte telle qu'elle apparaît sur la capture (pour comparer avec ce que l'application a lu) */
+  function cardCrop(cv, card) {
+    try {
+      var w = card.x1 - card.x0, y0 = Math.max(0, Math.round(card.top - 1.42 * w)), y1 = Math.min(cv.height, Math.round(card.top + 0.01 * w));
+      var x0 = Math.max(0, Math.round(card.x0)), x1 = Math.min(cv.width, Math.round(card.x1));
+      if (y1 - y0 < 20 || x1 - x0 < 20) return null;
+      var tw = 240, th = Math.round(tw * (y1 - y0) / (x1 - x0));
+      var c = document.createElement('canvas'); c.width = tw; c.height = th;
+      var cx = c.getContext('2d'); cx.imageSmoothingQuality = 'high';
+      cx.drawImage(cv, x0, y0, x1 - x0, y1 - y0, 0, 0, tw, th);
+      return c.toDataURL('image/jpeg', 0.62);
+    } catch (e) { return null; }
+  }
   function readCardFond(cv, card) {
     var w = card.x1 - card.x0, y0 = Math.max(0, Math.round(card.top - 1.33 * w)), y1 = Math.round(card.top - 0.04 * w);
     if (y1 - y0 < 40) return null;
@@ -2444,7 +2528,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
       var grid = isProfile ? { cards: found.cards, guessed: 0 } : completeGrid(found), cells = grid.cards;
       cells.sort(function (a, b) { return a.row - b.row || a.x0 - b.x0; });
       T.progress = 'Chargement du moteur de lecture (première fois seulement)…'; renderTab();
-      var rows = [], srcs = [], sks = [], fds = [], skipped = 0, seq = Promise.resolve();
+      var rows = [], srcs = [], sks = [], fds = [], crops = [], skipped = 0, seq = Promise.resolve();
       cells.forEach(function (card, i) {
         seq = seq.then(function () {
           stop();
@@ -2493,18 +2577,20 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
             // poste : celui de la base s'il est connu, sinon l'étiquette lue sur la carte
             var dbp = m.sure ? S.db.players[m.best.id] : null;
             var fd = null; try { fd = readCardFond(cv, card); } catch (e) { fd = null; }
+            var crop = cardCrop(cv, card);
             return readCardSkills(cv, card).catch(function () { return []; }).then(function (sk) {
-              if (dbp && dbp.pos) { rows.push(row); srcs.push(null); sks.push(sk); fds.push(fd); return null; }
+              if (dbp && dbp.pos) { rows.push(row); srcs.push(null); sks.push(sk); fds.push(fd); crops.push(crop); return null; }
               return readCardTag(cv, card).catch(function () { return null; }).then(function (tag) {
                 if (tag) row.position = tag;
-                rows.push(row); srcs.push(tag ? 'carte' : null); sks.push(sk); fds.push(fd);
+                rows.push(row); srcs.push(tag ? 'carte' : null); sks.push(sk); fds.push(fd); crops.push(crop);
               });
             });
           });
         });
       });
       return seq.then(function () {
-        T.srcs = srcs; T.sks = sks; T.fds = fds; T.nCells = cells.length;
+        T.srcs = srcs; T.sks = sks; T.fds = fds; T.crops = crops; T.nCells = cells.length;
+        try { var topY = Math.min.apply(null, cells.map(function (c) { return c.top - 1.42 * (c.x1 - c.x0); })); T.focus = Math.max(0, Math.min(0.9, (topY - 0.03 * cv.height) / cv.height)); } catch (e) { T.focus = 0; }
         if (grid.guessed) notes.push('La dernière ligne est partiellement cachée par le bandeau du bas : vérifiez qu\'il ne manque aucun joueur (bouton « Ajouter un joueur »).');
         return rows;
       });
@@ -2513,6 +2599,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
       if (!rr.length) throw { code: 'x', message: 'Aucun nom lisible sur cette capture. Vérifiez que votre base contient des joueurs (onglet Importer), ou ajoutez-les à la main.' };
       T.members = C.matchTeam(S.db.players, rr);
       T.members.forEach(function (m, i) { if (T.srcs && T.srcs[i]) m.posSrc = T.srcs[i]; });
+      T.members.forEach(function (m, i) { if (T.crops && T.crops[i]) m.crop = T.crops[i]; });
       var fondRead = 0, fondUnsure = [];
       T.members.forEach(function (m, i) {
         var fd = T.fds && T.fds[i];
@@ -2646,6 +2733,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     h += '<label class="btn primary big" for="shot-input">' + ICONS.analyse + '<span>Envoyer une capture d\'écran</span></label>';
     h += '<input id="shot-input" type="file" accept="image/*" hidden>';
     h += '</section>';
+    h += howtoCard('opp');
 
     if (t.state === 'reading') {
       h += '<section class="card busy"><div class="spin" aria-hidden="true"></div><div><b>Lecture de la capture…</b><p class="muted">' + esc(t.progress || 'Cela prend en général 10 à 60 secondes.') + '</p></div><button class="btn ghost" data-act="stop-shot">Arrêter</button></section>';
@@ -2653,7 +2741,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     (t.notes || []).forEach(function (n) { h += '<p class="note warn">' + esc(n) + '</p>'; });
     if (t.err) h += '<section class="card alert bad"><p>' + esc(t.err) + '</p></section>';
 
-    if (t.img && t.state !== 'idle') {
+    if (t.img && t.state !== 'idle' && !t.members.length) {
       h += '<details class="card shot"><summary>Voir la capture envoyée</summary><img src="' + esc(t.img.url) + '" alt="Capture envoyée"></details>';
     }
 
@@ -2663,7 +2751,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
         h += '<h2 class="sec">' + plural(t.members.length, 'joueur détecté', 'joueurs détectés') + '</h2>';
         h += '<p class="muted small">Version de l\'application : ' + esc(BUILD) + '</p>';
         if (unresolved) h += '<p class="note warn">' + plural(unresolved, 'joueur n\'est', 'joueurs ne sont') + ' pas reconnu' + (unresolved > 1 ? 's' : '') + ' avec certitude : leurs statistiques sont comptées comme manquantes tant que vous ne les avez pas confirmés.</p>';
-        h += '<div class="members">' + t.members.map(renderMember).join('') + '</div>';
+        h += '<div class="pinwrap">' + shotBar(t) + '<div class="members">' + t.members.map(renderMember).join('') + '</div></div>';
       }
       h += '<div class="row gap"><button class="btn" data-act="add-member">+ Ajouter un joueur</button>' +
         (t.img && t.state === 'done' ? '<button class="btn ghost" data-act="rerun-shot">Relire la capture</button>' : '') + '</div>';
@@ -2680,12 +2768,28 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     return h;
   }
 
+  /* Capture envoyée : bouton, puis panneau épinglé en haut de l'écran pendant qu'on fait défiler les joueurs */
+  function shotBar(t) {
+    if (!t.img || !t.img.url) return '';
+    if (!t.pin) return '<button class="btn small shotbtn" data-act="shot-pin">Voir la capture à côté des joueurs</button>';
+    return '<div class="shotpin' + (t.pinBig ? ' tall' : '') + '"><div class="shotbar"><b>Votre capture</b><span><button class="btn small ghost" data-act="shot-size">' + (t.pinBig ? 'Réduire' : 'Agrandir') + '</button><button class="btn small ghost" data-act="shot-pin">Fermer</button></span></div><div class="shotscroll" data-focus="' + (t.focus || 0) + '"><img src="' + esc(t.img.url) + '" alt="Capture envoyée"></div></div>';
+  }
+  function readSummary(m) {
+    var p = m.id ? S.db.players[m.id] : null, bits = [];
+    bits.push('<b>' + esc(p ? p.name : m.name) + '</b>');
+    var pos = (p && p.pos) || m.pos; if (pos) bits.push(esc(pos));
+    var fd = C.MUTATIONS.filter(function (k) { return k.key === m.fond; })[0]; if (fd) bits.push('fond ' + esc(fd.name));
+    var sk = C.SKILLS.filter(function (k) { return m.skills && m.skills[k.key] > 0; }).map(function (k) { return esc(k.name) + (m.skills[k.key] > 1 ? ' x' + m.skills[k.key] : ''); });
+    if (sk.length) bits.push(sk.join(', '));
+    return bits.join(' · ');
+  }
+
   function renderMember(m) {
     var p = m.id ? S.db.players[m.id] : null, e = effStats(m);
     var st = !m.id ? (m.status === 'new' ? badge('bad', 'Inconnu') : badge('warn', 'À confirmer'))
       : (m.status === 'exact' ? badge('ok', 'Reconnu') : badge('ok', 'Confirmé'));
     var h = '<article class="member' + (m.id ? '' : ' unres') + '" data-key="' + m.key + '">';
-    h += '<div class="mhead"><div><div class="mname">' + esc(p ? p.name : m.name) + '</div>';
+    h += '<div class="mhead">' + (m.crop ? '<button class="mthumb" data-act="crop-open" data-key="' + m.key + '" aria-label="Agrandir la carte sur la capture"><img src="' + esc(m.crop) + '" alt="Carte sur la capture"></button>' : '') + '<div class="mtxt"><div class="mname">' + esc(p ? p.name : m.name) + '</div>';
     var sub = [];
     if (p && m.name !== p.name) sub.push('lu : « ' + esc(m.name) + ' »');
     var pos = (p && p.pos) || m.pos, club = (p && p.club) || m.club;
@@ -2854,14 +2958,14 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   }
   function mineSnapshot() {
     return {
-      members: S.mine.team.members.map(function (m) { return { key: m.key, id: m.id || null, name: m.name, pos: m.pos || null, club: m.club || null, skills: m.skills || {}, fond: m.fond || null }; }),
+      members: S.mine.team.members.map(function (m) { return { key: m.key, id: m.id || null, name: m.name, pos: m.pos || null, club: m.club || null, skills: m.skills || {}, fond: m.fond || null, crop: m.crop || null }; }),
       bonus: S.mine.bonus, mainsOff: S.mine.mainsOff
     };
   }
   function applyMine(d) {
     if (!d || !Array.isArray(d.members)) return;
     S.mine.team = { state: 'done', err: '', img: null, ctl: null, members: d.members.map(function (m, i) {
-      return { key: m.key != null ? m.key : i, id: m.id && S.db.players[m.id] ? m.id : null, name: m.name, pos: m.pos, club: m.club, skills: m.skills || {}, fond: m.fond || null, seen: { def: null, atk: null }, unreadable: false, status: 'manual', candidates: [] };
+      return { key: m.key != null ? m.key : i, id: m.id && S.db.players[m.id] ? m.id : null, name: m.name, pos: m.pos, club: m.club, skills: m.skills || {}, fond: m.fond || null, crop: m.crop || null, seen: { def: null, atk: null }, unreadable: false, status: 'manual', candidates: [] };
     }) };
     S.mine.bonus = Object.assign({ def: '', atk: '', clubDef: '', clubAtk: '', critDef: '', critAtk: '' }, d.bonus || {});
     S.mine.mainsOff = d.mainsOff || {};
@@ -2964,6 +3068,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     var h = '<section class="hero"><div class="herohead"><h1>Duel</h1><div class="mascot" aria-hidden="true"></div></div>';
     h += '<p class="sub">Votre équipe, avec ses compétences et ses bonus, contre l\'équipe adverse analysée dans l\'onglet « Analyser » : vos chances de gagner sont calculées.</p></section>';
     h += '<div id="duel-verdict">' + duelVerdictHtml() + '</div>';
+    h += howtoCard('mine');
     h += '<div data-ctx="mine"><h2 class="sec">Mon équipe</h2>';
     h += inMine(function () {
       var t = S.team, x = '';
@@ -2973,9 +3078,9 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
         if (t.state === 'reading') x += '<section class="card busy"><div class="spin" aria-hidden="true"></div><div><b>Lecture de la capture…</b><p class="muted">' + esc(t.progress || 'Cela prend en général 10 à 60 secondes.') + '</p></div><button class="btn ghost" data-act="stop-shot">Arrêter</button></section>';
         (t.notes || []).forEach(function (n) { x += '<p class="note warn">' + esc(n) + '</p>'; });
         if (t.err) x += '<section class="card alert bad"><p>' + esc(t.err) + '</p></section>';
-        if (t.img && t.state !== 'idle') x += '<details class="card shot"><summary>Voir la capture envoyée</summary><img src="' + esc(t.img.url) + '" alt="Capture envoyée"></details>';
+        if (t.img && t.state !== 'idle' && !t.members.length) x += '<details class="card shot"><summary>Voir la capture envoyée</summary><img src="' + esc(t.img.url) + '" alt="Capture envoyée"></details>';
       }
-      if (t.members.length) x += '<div class="members">' + t.members.map(renderMember).join('') + '</div>';
+      if (t.members.length) x += '<div class="pinwrap">' + (LOCAL ? shotBar(t) : '') + '<div class="members">' + t.members.map(renderMember).join('') + '</div></div>';
       x += '<div class="row gap"><button class="btn" data-act="add-member">+ Ajouter un joueur</button>' + (t.img && t.state === 'done' && LOCAL ? '<button class="btn ghost" data-act="rerun-shot">Relire la capture</button>' : '') + (t.members.length && !S.confirmMine ? '<button class="btn ghost danger" data-act="mine-clear">Vider mon équipe</button>' : '') + '</div>';
       if (t.members.length && S.confirmMine) x += '<p class="note bad">Retirer tous les joueurs de votre équipe ?</p><div class="row gap"><button class="btn danger" data-act="mine-clear-do">Oui, vider</button><button class="btn ghost" data-act="mine-clear-no">Non</button></div>';
       if (t.members.length) {
@@ -3145,7 +3250,9 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     var r = S.db.rules;
     var h = '<section class="hero"><h1>Réglages</h1><p class="sub">Les règles de calcul sont ici : changez-les si le jeu évolue avec les rebirths.</p></section>';
     var th = getTheme();
-    h += '<section class="card news"><h2 class="sec in">Nouveautés</h2><p class="muted small">Version de l\'application : ' + esc(BUILD) + '</p><ul class="newslist">' + NEWS.map(function (n) { return '<li><span class="nwhen">' + esc(n.when) + '</span><b>' + esc(n.title) + '</b><span class="ntext">' + esc(n.text) + '</span></li>'; }).join('') + '</ul></section>';
+    var nOpen = uiGet('news', false);
+    h += '<section class="card fold news"><button class="foldhead" data-act="ui-toggle" data-key="news" aria-expanded="' + nOpen + '"><span><b>Nouveautés</b><small>Version : ' + esc(BUILD) + ' · ' + esc(NEWS[0].title) + '</small></span>' + CHEVRON + '</button>' +
+      (nOpen ? '<div class="foldbody"><ul class="newslist">' + NEWS.map(function (n) { return '<li><span class="nwhen">' + esc(n.when) + '</span><b>' + esc(n.title) + '</b><span class="ntext">' + esc(n.text) + '</span></li>'; }).join('') + '</ul></div>' : '') + '</section>';
     h += '<section class="card"><h2 class="sec in">Thème</h2><div class="themeopts">' + [['light', 'Blanc'], ['dark', 'Noir'], ['auto', 'Auto']].map(function (o) { return '<button class="btn' + (th === o[0] ? ' on' : ' ghost') + '" data-act="theme" data-th="' + o[0] + '">' + o[1] + '</button>'; }).join('') + '</div><p class="muted small">Auto suit le réglage de votre iPhone.</p></section>';
     h += '<section class="card"><h2 class="sec in">Règle de calcul</h2>';
     h += '<div class="grid2"><label class="field"><span>Joueur principal (%)</span><input id="r-main" type="text" inputmode="decimal" value="' + esc(r.mainPct) + '"></label>' +
@@ -3171,6 +3278,8 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     var h = '<div class="scrim" data-act="modal-close"></div><div class="sheet" role="dialog" aria-modal="true">';
     if (m.type === 'pick') {
       h += '<h2>' + esc(m.title) + '</h2><input id="pick-q" class="search" type="search" placeholder="Nom ou club" autocomplete="off" value="' + esc(m.q || '') + '"><div id="pick-list">' + pickList(m) + '</div><button class="btn ghost" data-act="modal-close">Annuler</button>';
+    } else if (m.type === 'crop') {
+      h += '<h2>Carte sur la capture</h2><img class="cropbig" src="' + esc(m.src) + '" alt="Carte sur la capture"><p class="small">L\'application a lu : ' + m.info + '</p><button class="btn ghost" data-act="modal-close">Fermer</button>';
     } else if (m.type === 'rename') {
       h += '<h2>Corriger le nom lu</h2><label class="field"><span>Nom du joueur</span><input id="rn" type="text" value="' + esc(m.value) + '" autocomplete="off"></label><div class="row gap"><button class="btn primary" data-act="rename-ok">Relancer la recherche</button><button class="btn ghost" data-act="modal-close">Annuler</button></div>';
     } else if (m.type === 'edit') {
@@ -3213,6 +3322,17 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     var txt = S.saving || S.saveErr || '';
     el.textContent = txt; el.className = 'status' + (S.saveErr ? ' bad' : '');
   }
+  /* Panneau capture : s'ouvre sur la zone des cartes, et garde sa position quand l'écran se met à jour */
+  function placeShotScroll(v, memo) {
+    var sc = v.querySelector('.shotscroll'); if (!sc) return;
+    var img = sc.querySelector('img'); if (!img) return;
+    var focus = parseFloat(sc.getAttribute('data-focus')) || 0;
+    function place() {
+      if (memo && memo.src === img.src) sc.scrollTop = memo.ratio * sc.scrollHeight;
+      else sc.scrollTop = focus * sc.scrollHeight;
+    }
+    if (img.complete && img.naturalHeight) place(); else img.addEventListener('load', place);
+  }
   function renderTab() {
     if (OPP) { S.needRender = true; return; }
     var v = $('#view'); if (!v) return;
@@ -3225,7 +3345,9 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     else if (S.tab === 'players') html = renderPlayers();
     else html = renderSettings();
     if (S.ready && S.note && S.storage !== 'db' && S.tab === 'analyse') html = '<p class="note warn small">' + esc(S.note) + '</p>' + html;
+    var oldSc = v.querySelector('.shotscroll'), memo = oldSc ? { src: (oldSc.querySelector('img') || {}).src, top: oldSc.scrollTop, ratio: oldSc.scrollHeight ? oldSc.scrollTop / oldSc.scrollHeight : 0 } : null;
     v.innerHTML = html;
+    placeShotScroll(v, memo);
     $$('.tabbar button').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === S.tab); b.setAttribute('aria-current', b.getAttribute('data-tab') === S.tab ? 'page' : 'false'); });
     renderStatus();
     window.scrollTo(0, y);
@@ -3280,6 +3402,10 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     var act = el.getAttribute('data-act'), d = el.dataset, m, job;
     switch (act) {
       case 'stop-shot': if (S.team.ctl) S.team.ctl.abort(); break;
+      case 'shot-pin': S.team.pin = !S.team.pin; renderTab(); break;
+      case 'shot-size': S.team.pinBig = !S.team.pinBig; renderTab(); break;
+      case 'crop-open':
+        m = memberByKey(d.key); if (m && m.crop) { S.modal = { type: 'crop', src: m.crop, info: readSummary(m) }; renderModal(); } break;
       case 'rerun-shot': if (S.team.img && S.team.img.file) analyseScreenshot(S.team.img.file, true, !!OPP); break;
       case 'add-member':
         S.modal = { type: 'pick', title: 'Ajouter un joueur', q: '', target: 'add' }; renderModal(); break;
@@ -3316,6 +3442,8 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
         S.team = { state: 'idle', members: [], err: '', img: null, ctl: null };
         S.bonus = { def: '', atk: '', clubDef: '', clubAtk: '', critDef: '', critAtk: '' }; S.mainsOff = {}; S.confirmOpp = false;
         renderTab(); toast('Analyse supprimée'); break;
+      case 'ui-toggle':
+        uiSet(d.key, !uiGet(d.key, d.key === 'howto')); renderTab(); break;
       case 'theme':
         setTheme(d.th); renderTab(); break;
       case 'pick-do':
