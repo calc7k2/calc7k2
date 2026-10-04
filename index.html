@@ -292,6 +292,14 @@ td:first-child { width: 58%; }
 .vs span{color:var(--muted);font-size:13px}
 tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color:var(--bad);font-weight:600}
 
+/* Nouveautés (Réglages) */
+.newslist { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.newslist li { display: flex; flex-direction: column; gap: 3px; padding-left: 12px; border-left: 3px solid var(--accent-soft); min-width: 0; }
+.newslist li:first-child { border-left-color: var(--accent); }
+.newslist .nwhen { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.newslist b { font-size: 16px; }
+.newslist .ntext { font-size: 14px; color: var(--muted); line-height: 1.45; overflow-wrap: anywhere; }
+
 </style></head><body>
 <header class="top"><div class="brand">Mon <span>calculateur</span></div><div id="status" class="status" role="status"></div></header>
 <main id="view"></main>
@@ -1417,7 +1425,16 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   /* ----- Mode serveur (application hors de Claude) : base et lecture d'images passent par le serveur ----- */
   var SERVER = !!window.SNATCH_SERVER;
   /* Mode « local » : tout reste sur l'appareil (base IndexedDB), lecture des images par OCR gratuit sur l'appareil. Aucun serveur, aucune API payante. */
-  var BUILD = '04/10 16:50';
+  var BUILD = '04/10 17:46';
+  /* Historique des mises à jour (affiché dans Réglages) : une ligne simple par amélioration, la plus récente en premier.
+     À compléter à chaque nouvelle version. */
+  var NEWS = [
+    { when: '4 octobre', title: 'Noms de joueurs mieux lus', text: 'Une liste d\'environ 51 000 joueurs aide l\'application à corriger un nom mal lu sur une capture, même si le joueur n\'est pas dans votre base. Leurs statistiques ne changent pas.' },
+    { when: '4 octobre', title: 'Capture de profil et de lineup, quel que soit le fond', text: 'L\'équipe se lit aussi bien depuis le Lineup que depuis la page de profil, avec n\'importe quelle couleur de fond. Dans Duel, vous pouvez envoyer la capture de votre propre équipe.' },
+    { when: '4 octobre', title: 'Compétences comme dans le jeu', text: 'Les compétences (Attacker, Captain, On Fire…) sont ajoutées à la carte avant le calcul 100 % / 25 %. Cela corrige l\'écart de 1 à 2 points avec le jeu.' },
+    { when: '4 octobre', title: 'Chance de critique et Duel', text: 'Le fond de chaque carte est lu automatiquement (Gold, Holo, Live, Locker, Splash). Le Duel donne la probabilité de victoire en tenant compte des critiques.' },
+    { when: 'Au départ', title: 'Les bases', text: 'Import des fichiers Snatch Watch (PDF, Excel, CSV, images), lecture d\'une capture de l\'équipe adverse, calcul de la Défense et de l\'Attaque, sauvegarde sur votre téléphone.' }
+  ];
   var LOCAL = !!window.SNATCH_LOCAL;
 
   function makeLocalShims() {
@@ -3128,6 +3145,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     var r = S.db.rules;
     var h = '<section class="hero"><h1>Réglages</h1><p class="sub">Les règles de calcul sont ici : changez-les si le jeu évolue avec les rebirths.</p></section>';
     var th = getTheme();
+    h += '<section class="card news"><h2 class="sec in">Nouveautés</h2><p class="muted small">Version de l\'application : ' + esc(BUILD) + '</p><ul class="newslist">' + NEWS.map(function (n) { return '<li><span class="nwhen">' + esc(n.when) + '</span><b>' + esc(n.title) + '</b><span class="ntext">' + esc(n.text) + '</span></li>'; }).join('') + '</ul></section>';
     h += '<section class="card"><h2 class="sec in">Thème</h2><div class="themeopts">' + [['light', 'Blanc'], ['dark', 'Noir'], ['auto', 'Auto']].map(function (o) { return '<button class="btn' + (th === o[0] ? ' on' : ' ghost') + '" data-act="theme" data-th="' + o[0] + '">' + o[1] + '</button>'; }).join('') + '</div><p class="muted small">Auto suit le réglage de votre iPhone.</p></section>';
     h += '<section class="card"><h2 class="sec in">Règle de calcul</h2>';
     h += '<div class="grid2"><label class="field"><span>Joueur principal (%)</span><input id="r-main" type="text" inputmode="decimal" value="' + esc(r.mainPct) + '"></label>' +
