@@ -1107,10 +1107,12 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
         var lines = all.map(function (i) {
           var p = members[i], isMain = i === mi;
           var pct = isMain ? rules.mainPct : rules.supportPct;
-          var sk = 0;
-          var base = p[s] == null ? null : p[s];
+          /* Règle du jeu : les compétences améliorent la carte elle-même (ATK/DEF), puis la carte compte à 100 % (principale) ou 25 % (support). */
+          var sk = skillAdd(p.skills, s);
+          var base0 = p[s] == null ? null : p[s];
+          var base = base0 == null ? null : base0 + sk;
           return {
-            index: i, name: p.name, skill: sk, role: isMain ? 'principal' : 'support', pct: pct, est: !!p[s + 'Est'],
+            index: i, name: p.name, skill: sk, base0: base0, role: isMain ? 'principal' : 'support', pct: pct, est: !!p[s + 'Est'],
             base: base, contrib: contribution(base, pct, rules.rounding)
           };
         });
@@ -1118,7 +1120,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
         var missing = lines.filter(function (l) { return l.contrib == null; });
         var subtotal = known.reduce(function (a, l) { return a + l.contrib; }, 0);
         var mainMissing = lines.filter(function (l) { return l.index === mi; })[0].contrib == null;
-        var total = subtotal + skillsTotal + b + (clubAdded ? cb : 0);
+        var total = subtotal + b + (clubAdded ? cb : 0);
         var c = crit[s];
         /* Critiques : chaque carte tire son propre critique (chance de son fond) ; un critique multiplie seulement la note de cette carte. */
         var cm = rules.critMult || 1.25, dist = null, expTotal = null, maxTotal = null;
@@ -1139,7 +1141,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
             });
             map = nm;
           });
-          var off = subtotal + skillsTotal + b + (clubAdded ? cb : 0);
+          var off = subtotal + b + (clubAdded ? cb : 0);
           dist = Object.keys(map).map(function (k) { return { total: off + (+k), p: map[k] }; }).sort(function (a, z) { return a.total - z.total; });
           expTotal = dist.reduce(function (a, x) { return a + x.total * x.p; }, 0);
           maxTotal = total + maxExtra;
@@ -1147,7 +1149,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
         return {
           dist: dist, expTotal: expTotal, maxTotal: maxTotal,
           mainIndex: mi, mainName: members[mi].name, lines: lines,
-          subtotal: subtotal, skills: skillsTotal, bonus: b, club: clubAdded ? cb : null,
+          subtotal: subtotal, skills: 0, skillsOnCards: skillsTotal, bonus: b, club: clubAdded ? cb : null,
           total: total, missingCount: missing.length, missingNames: missing.map(function (l) { return l.name; }),
           mainMissing: mainMissing, complete: missing.length === 0,
           critTotal: c != null ? total + c : null, crit: c == null ? null : c
@@ -1155,7 +1157,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
       });
       var complete = cands.filter(function (x) { return x.complete; });
       result[s] = {
-        stat: s, candidates: cands, skills: skillsTotal, bonus: b, club: clubAdded ? cb : null,
+        stat: s, candidates: cands, skills: 0, skillsOnCards: skillsTotal, bonus: b, club: clubAdded ? cb : null,
         min: complete.length ? Math.min.apply(null, complete.map(function (x) { return x.total; })) : null,
         max: complete.length ? Math.max.apply(null, complete.map(function (x) { return x.total; })) : null,
         allComplete: complete.length === cands.length,
@@ -1342,7 +1344,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   /* ----- Mode serveur (application hors de Claude) : base et lecture d'images passent par le serveur ----- */
   var SERVER = !!window.SNATCH_SERVER;
   /* Mode « local » : tout reste sur l'appareil (base IndexedDB), lecture des images par OCR gratuit sur l'appareil. Aucun serveur, aucune API payante. */
-  var BUILD = '04/10 02:22';
+  var BUILD = '04/10 02:46';
   var LOCAL = !!window.SNATCH_LOCAL;
 
   function makeLocalShims() {
@@ -2143,15 +2145,16 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     cands.push(function () { return frameBy(function (i) { var r = d[i], g = d[i + 1], b = d[i + 2]; return r > 115 && g > 90 && b < 130 && r - b > 95 && r >= g && g > 0.72 * r; }, 0.1, 0.1, 0, W); });
     /* 3. image partagée au format 9:16 : le cadre occupe toujours la même place */
     if (Math.abs(W / H - 0.5625) < 0.03) cands.push(function () { return { ry: [Math.round(H * 0.205), Math.round(H * 0.892)], rx: [Math.round(W * 0.030), Math.round(W * 0.970)] }; });
-    /* case vide : pas de nom (le nom est en noir cerné de blanc) */
+    /* case vide : pas de nom. Le nom est écrit en noir presque neutre (quelle que soit la couleur du liseré clair autour) ;
+       le motif flou d'une case vide, lui, est coloré. */
     function hasName(cd, w) {
-      var xa = cd.x0 + Math.round(0.1 * w), xb = cd.x1 - Math.round(0.1 * w), ya = cd.top - Math.round(0.40 * w), yb = cd.top - Math.round(0.05 * w), n = 0, wh = 0, dk = 0, px, py;
+      var xa = cd.x0 + Math.round(0.1 * w), xb = cd.x1 - Math.round(0.1 * w), ya = cd.top - Math.round(0.40 * w), yb = cd.top - Math.round(0.05 * w), n = 0, dk = 0, px, py;
       if (ya < 0 || yb > H) return true;
       for (py = ya; py < yb; py += 2) for (px = xa; px < xb; px += 2) {
         var i = (py * W + px) * 4, r = d[i], g = d[i + 1], b = d[i + 2], l = (r * 299 + g * 587 + b * 114) / 1000; n++;
-        if (r > 165 && g > 165 && b > 165 && Math.max(r, g, b) - Math.min(r, g, b) < 60) wh++; else if (l < 70) dk++;
+        if (l < 70 && Math.max(r, g, b) - Math.min(r, g, b) < 50) dk++;
       }
-      return wh / n >= 0.004 && dk / n >= 0.01;
+      return dk / n >= 0.02;
     }
     for (var ci = 0; ci < cands.length; ci++) {
       var fr = cands[ci](); if (!fr) continue;
@@ -2651,7 +2654,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     h += '<div class="grid2">' + f('clubDef', 'Bonus de club DEF', b.clubDef, 'vide = non confirmé', 'Ajouté seulement si rempli') + f('clubAtk', 'Bonus de club ATK', b.clubAtk, 'vide = non confirmé', 'Ajouté seulement si rempli') + '</div>';
     h += '<details class="more"><summary>Critique (aléatoire, facultatif)</summary><p class="muted small">Les critiques sont aléatoires : elles ne sont jamais incluses dans le total. Si vous connaissez leur valeur, elle est affichée à part.</p>';
     h += '<div class="grid2">' + f('critDef', 'Critique DEF (+)', b.critDef, 'inconnu', '') + f('critAtk', 'Critique ATK (+)', b.critAtk, 'inconnu', '') + '</div></details>';
-    h += '<p class="muted small">Compétences : touchez une compétence sur la carte du joueur pour l\'ajouter (touchez encore pour x2, x3…). Leur DEF/ATK s\'ajoute au score final de l\'équipe (pas à la carte) ; Income ignoré ; Crit non inclus.</p></section>';
+    h += '<p class="muted small">Compétences : touchez une compétence sur la carte du joueur pour l\'ajouter (touchez encore pour x2, x3…). Leur DEF/ATK s\'ajoute à la carte du joueur (comme dans le jeu), puis la carte compte à 100 % ou 25 % ; Income ignoré.</p></section>';
     return h;
   }
 
@@ -2719,7 +2722,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
         var raw = l.base == null ? null : l.base * l.pct / 100;
         var part = l.contrib == null ? '<span class="warn">manquante</span>' :
           (Math.abs(raw - l.contrib) > 1e-9 ? fmt(raw) + ' → <b>' + fmt(l.contrib) + '</b>' : '<b>' + fmt(l.contrib) + '</b>');
-        h += '<tr class="' + l.role + '"><td>' + esc(l.name) + '<small>' + (l.role === 'principal' ? 'principal' : 'support') + ' · ' + fmt(l.pct) + '\u00a0%' + (l.est ? ' · estimé (50e − 1)' : '') + '</small></td><td>' + (l.base == null ? '—' : fmt(l.base)) + '</td><td>' + part + '</td></tr>';
+        h += '<tr class="' + l.role + '"><td>' + esc(l.name) + '<small>' + (l.role === 'principal' ? 'principal' : 'support') + ' · ' + fmt(l.pct) + '\u00a0%' + (l.est ? ' · estimé (50e − 1)' : '') + '</small></td><td>' + (l.base == null ? '—' : fmt(l.base)) + (l.skill ? '<small>' + (l.skill > 0 ? '+' : '−') + fmt(Math.abs(l.skill)) + ' compét.</small>' : '') + '</td><td>' + part + '</td></tr>';
       });
       h += '</tbody><tfoot>';
       h += '<tr><td colspan="2">Sous-total</td><td>' + fmt(c.subtotal) + '</td></tr>';
