@@ -1756,7 +1756,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   /* ----- Mode serveur (application hors de Claude) : base et lecture d'images passent par le serveur ----- */
   var SERVER = !!window.SNATCH_SERVER;
   /* Mode « local » : tout reste sur l'appareil (base IndexedDB), lecture des images par OCR gratuit sur l'appareil. Aucun serveur, aucune API payante. */
-  var BUILD = '04/10 21:03';
+  var BUILD = '04/10 21:26';
   /* Blocs repliables (Nouveautés, exemple de capture) : le choix est gardé sur l'appareil */
   function uiGet(key, def) {
     try { var o = JSON.parse(localStorage.getItem('snatch.ui') || '{}'); if (o && typeof o[key] === 'boolean') return o[key]; } catch (e) { /* ignore */ }
@@ -1797,6 +1797,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   /* Historique des mises à jour (affiché dans Réglages) : une ligne simple par amélioration, la plus récente en premier.
      À compléter à chaque nouvelle version. */
   var NEWS = [
+    { when: '4 octobre', title: 'Bonus de club en haut de page', text: 'Le bonus de club est maintenant tout en haut d\'Adversaire et de Mon équipe. Les champs « Bonus DEF » et « Bonus ATK » inutiles ont été retirés. Les captures sont aussi mieux lues quand le bandeau du bas cache une rangée, quel que soit le fond.' },
     { when: '4 octobre', title: 'Analyse du match', text: 'Nouvel onglet « Analyse » (analyse de fin de match) : envoyez la capture de l\'écran de résultat d\'un duel et vous obtenez le verdict, le détail ligne par ligne, les critiques de chaque camp et ce qui aurait changé sans eux ou sans le bonus Club. Les matchs sont gardés pour calculer votre taux réel de critiques. Les Réglages sont maintenant sur la roue dentée en haut à droite.' },
     { when: '4 octobre', title: 'Onglets plus clairs et duel animé', text: '« Analyser » devient « Adversaire ». Votre équipe a maintenant son onglet « Mon équipe », et l\'onglet « Duel » rassemble le verdict, les critiques et le détail des deux équipes, avec un petit match animé : vos joueurs attaquent, tirent, marquent ou se font arrêter (rejouable, avec tirage au sort).' },
     { when: '4 octobre', title: 'La capture à côté des joueurs', text: 'Chaque joueur affiche la miniature de sa carte telle qu\'elle est sur votre capture (touchez-la pour l\'agrandir). Le bouton « Voir la capture à côté des joueurs » épingle la capture en haut de l\'écran pendant que vous faites défiler la liste, pour repérer les erreurs.' },
@@ -3067,7 +3068,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
       mains: mains,
       calc: mains.length ? C.calcTeam(members, {
         rules: S.db.rules, mains: mains, roles: true,
-        bonus: { def: numOrNull(b.def), atk: numOrNull(b.atk) },
+        bonus: { def: null, atk: null },
         club: { def: numOrNull(b.clubDef), atk: numOrNull(b.clubAtk) },
         crit: { def: numOrNull(b.critDef), atk: numOrNull(b.critAtk) }
       }) : null
@@ -3411,6 +3412,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     h += '<label class="btn primary big" for="shot-input">' + ICONS.analyse + '<span>Envoyer une capture d\'écran</span></label>';
     h += '<input id="shot-input" type="file" accept="image/*" hidden>';
     h += '</section>';
+    h += renderBonusPanel();
     h += howtoCard('opp');
 
     if (t.state === 'reading') {
@@ -3440,7 +3442,6 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     }
 
     if (t.members.length) {
-      h += renderBonusPanel();
       h += '<div id="results">' + renderResults() + '</div>';
     }
     return h;
@@ -3528,12 +3529,10 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     function f(id, label, val, ph, hint) {
       return '<label class="field"><span>' + label + '</span><input id="b-' + id + '" data-field="bonus" data-name="' + id + '" type="text" inputmode="decimal" autocomplete="off" placeholder="' + ph + '" value="' + esc(val) + '">' + (hint ? '<small>' + hint + '</small>' : '') + '</label>';
     }
-    var h = '<section class="card"><h2 class="sec in">Bonus</h2><p class="muted small">Le nombre saisi est ajouté tel quel au total. Laissez vide s\'il n\'y en a pas.</p>';
-    h += '<div class="grid2">' + f('def', 'Bonus DEF (+)', b.def, '0', '') + f('atk', 'Bonus ATK (+)', b.atk, '0', '') + '</div>';
-    h += '<div class="grid2">' + f('clubDef', 'Bonus de club DEF', b.clubDef, 'vide = non confirmé', 'Ajouté seulement si rempli') + f('clubAtk', 'Bonus de club ATK', b.clubAtk, 'vide = non confirmé', 'Ajouté seulement si rempli') + '</div>';
+    var h = '<section class="card bonuscard"><h2 class="sec in">Bonus de club</h2><p class="muted small">Le nombre saisi est ajouté tel quel au total. Laissez vide s\'il n\'est pas connu.</p>';
+    h += '<div class="grid2">' + f('clubDef', 'Bonus de club DEF', b.clubDef, 'inconnu', 'Ajouté seulement si rempli') + f('clubAtk', 'Bonus de club ATK', b.clubAtk, 'inconnu', 'Ajouté seulement si rempli') + '</div>';
     h += '<details class="more"><summary>Critique (aléatoire, facultatif)</summary><p class="muted small">Les critiques sont aléatoires : elles ne sont jamais incluses dans le total. Si vous connaissez leur valeur, elle est affichée à part.</p>';
-    h += '<div class="grid2">' + f('critDef', 'Critique DEF (+)', b.critDef, 'inconnu', '') + f('critAtk', 'Critique ATK (+)', b.critAtk, 'inconnu', '') + '</div></details>';
-    h += '<p class="muted small">Compétences : touchez une compétence sur la carte du joueur pour l\'ajouter (touchez encore pour x2, x3…). Leur DEF/ATK s\'ajoute à la carte du joueur (comme dans le jeu), puis la carte compte à 100 % ou 25 % ; Income ignoré.</p></section>';
+    h += '<div class="grid2">' + f('critDef', 'Critique DEF (+)', b.critDef, 'inconnu', '') + f('critAtk', 'Critique ATK (+)', b.critAtk, 'inconnu', '') + '</div></details></section>';
     return h;
   }
 
@@ -3745,6 +3744,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   function renderMineTab() {
     var h = '<section class="hero"><div class="herohead"><h1>Mon équipe</h1><div class="mascot" aria-hidden="true"></div></div>';
     h += '<p class="sub">Envoyez la capture de votre équipe : ses joueurs, ses compétences, ses fonds et ses bonus sont gardés sur cet appareil. Le calcul face à l\'adversaire se fait dans l\'onglet « Duel ».</p></section>';
+    h += '<div data-ctx="mine">' + inMine(renderBonusPanel) + '</div>';
     h += howtoCard('mine');
     h += '<div data-ctx="mine">';
     h += inMine(function () {
@@ -3761,7 +3761,6 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
       x += '<div class="row gap"><button class="btn" data-act="add-member">+ Ajouter un joueur</button>' + (t.img && t.state === 'done' && LOCAL ? '<button class="btn ghost" data-act="rerun-shot">Relire la capture</button>' : '') + (t.members.length && !S.confirmMine ? '<button class="btn ghost danger" data-act="mine-clear">Vider mon équipe</button>' : '') + '</div>';
       if (t.members.length && S.confirmMine) x += '<p class="note bad">Retirer tous les joueurs de votre équipe ?</p><div class="row gap"><button class="btn danger" data-act="mine-clear-do">Oui, vider</button><button class="btn ghost" data-act="mine-clear-no">Non</button></div>';
       if (t.members.length) {
-        x += renderBonusPanel();
         x += '<details class="card more"><summary>Détail du calcul de mon équipe</summary><div id="mine-results">' + renderResults() + '</div></details>';
       }
       return x;
