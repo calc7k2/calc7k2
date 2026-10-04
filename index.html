@@ -228,9 +228,9 @@ tfoot tr.crit td { color: var(--muted); font-style: italic; border-bottom: 0; }
   background: color-mix(in srgb, var(--surface) 94%, transparent); border-top: 1.5px solid var(--line);
   padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
 }
-.tabbar > div { display: flex; width: 100%; max-width: 640px; gap: 4px; }
-.tabbar button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 58px; border: 0; background: transparent; border-radius: 14px; color: var(--muted); font-size: 12.5px; font-weight: 600; cursor: pointer; }
-.tabbar svg { width: 26px; height: 26px; }
+.tabbar > div { display: flex; width: 100%; max-width: 640px; gap: 2px; }
+.tabbar button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 58px; min-width: 0; padding: 0 1px; border: 0; background: transparent; border-radius: 14px; color: var(--muted); font-size: 10.5px; line-height: 1.1; text-align: center; justify-content: center; font-weight: 600; cursor: pointer; }
+.tabbar svg { width: 24px; height: 24px; }
 .tabbar button.on { color: var(--accent); background: var(--accent-soft); }
 #modal { position: fixed; inset: 0; z-index: 40; }
 .scrim { position: absolute; inset: 0; background: rgba(8, 14, 11, .55); }
@@ -332,11 +332,69 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
 .mthumb img { display: block; width: 100%; height: auto; }
 .cropbig { display: block; width: 100%; max-width: 280px; height: auto; margin: 4px auto 10px; border-radius: 12px; border: 1.5px solid var(--line); }
 
+/* Duel : les deux équipes */
+.dside summary { display: flex; flex-direction: column; gap: 2px; }
+.dside summary b { font-size: 17px; }
+.dlist { list-style: none; margin: 10px 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.drow { display: flex; gap: 10px; align-items: flex-start; min-width: 0; }
+.dthumb { flex: none; width: 46px; height: auto; border-radius: 6px; border: 1.5px solid var(--line); }
+.dtxt { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.dtxt small { color: var(--muted); }
+.dmeta { display: flex; flex-wrap: wrap; gap: 4px; font-size: 13px; }
+.dside summary { text-align: left; align-items: flex-start; }
+.dtxt .chips { justify-content: flex-start; }
+
+/* Duel animé */
+.arena { --foe: #c8452f; overflow: hidden; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .arena { --foe: #ff7a62; } }
+:root[data-theme="dark"] .arena { --foe: #ff7a62; }
+.arena .clash { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0 14px; }
+.arena .fighter { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1; min-width: 0; }
+.arena .fighter.me { color: var(--accent); }
+.arena .fighter.foe { color: var(--foe); }
+.arena .fighter b { color: var(--ink); font-size: 17px; }
+.arena .fighter small { color: var(--muted); }
+.arena .shieldbox { position: relative; width: 76px; height: 76px; }
+.arena .shieldbox svg { width: 100%; height: 100%; }
+.arena .shieldbox span { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--f-num); font-size: 30px; font-weight: 800; color: currentColor; padding-bottom: 4px; }
+.arena .vsbadge { position: relative; flex: none; width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--bg); font-family: var(--f-num); font-weight: 800; font-size: 20px; letter-spacing: .04em; }
+.arena .round { padding-top: 12px; border-top: 1.5px dashed var(--line); margin-top: 6px; }
+.arena .round h3 { margin: 0 0 8px; font-size: 15px; text-transform: uppercase; letter-spacing: .05em; }
+.arena .bar { margin-bottom: 8px; }
+.arena .brow { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; color: var(--muted); }
+.arena .brow b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.arena .track { height: 14px; border-radius: 8px; background: var(--surface2); overflow: hidden; margin-top: 3px; }
+.arena .fill { display: block; height: 100%; width: var(--w); border-radius: 8px; }
+.arena .fill.mine { background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #fff)); }
+.arena .fill.foe { background: linear-gradient(90deg, var(--foe), color-mix(in srgb, var(--foe) 60%, #fff)); }
+.arena .rverdict { margin-top: 10px; text-align: center; font-weight: 800; font-size: 18px; font-variant-numeric: tabular-nums; }
+.arena > .btn { margin-top: 14px; width: 100%; }
+
+.arena.pre .fill { width: 0; transition: none; }
+.arena.pre .fighter, .arena.pre .vsbadge, .arena.pre .rverdict { opacity: 0; }
+.arena.go .fill { transition: width 1.1s cubic-bezier(.2,.8,.2,1) var(--d, 0s); }
+.arena.go .fighter.me { animation: arenaL .7s cubic-bezier(.2,.9,.3,1) both; }
+.arena.go .fighter.foe { animation: arenaR .7s cubic-bezier(.2,.9,.3,1) both; }
+.arena.go .vsbadge { animation: arenaVs .7s .45s cubic-bezier(.2,1.4,.4,1) both; }
+.arena.go .vsbadge::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 3px solid var(--accent); opacity: 0; animation: arenaRing .8s .75s ease-out both; }
+.arena.go .shieldbox { animation: arenaHit .45s .85s ease-in-out both; }
+.arena.go .rverdict { animation: arenaPop .55s cubic-bezier(.2,1.5,.4,1) both; }
+.arena.go .round.r1 .rverdict { animation-delay: 1.8s; }
+.arena.go .round.r2 .rverdict { animation-delay: 3s; }
+@keyframes arenaL { from { transform: translateX(-70px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes arenaR { from { transform: translateX(70px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes arenaVs { from { transform: scale(3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes arenaRing { from { transform: scale(.8); opacity: .9; } to { transform: scale(2.4); opacity: 0; } }
+@keyframes arenaHit { 0%,100% { transform: none; } 30% { transform: translateX(-5px) rotate(-3deg); } 60% { transform: translateX(5px) rotate(3deg); } }
+@keyframes arenaPop { from { transform: scale(.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .arena * { animation: none !important; transition: none !important; } }
+
 </style></head><body>
 <header class="top"><div class="brand">Mon <span>calculateur</span></div><div id="status" class="status" role="status"></div></header>
 <main id="view"></main>
 <nav class="tabbar" aria-label="Navigation"><div>
-  <button data-tab="analyse"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l2-2.5h6L17 7h3v12H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.4" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>Analyser</button>
+  <button data-tab="analyse"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l2-2.5h6L17 7h3v12H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.4" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>Adversaire</button>
+  <button data-tab="mine"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 4 4 6.5 6 10l2-1v11h8V9l2 1 2-3.5L15.5 4c-.4 1.4-1.8 2.2-3.5 2.2S8.9 5.4 8.5 4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>Mon équipe</button>
   <button data-tab="duel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.4 3 7.6 7.5 9.5 4.5-1.9 7.5-5.1 7.5-9.5V6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m8.8 12.2 2.3 2.3 4.2-4.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Duel</button>
   <button data-tab="import"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Importer</button>
   <button data-tab="players"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 19c.5-3.2 2.8-5 5.5-5s5 1.8 5.5 5M16 6.2a3 3 0 0 1 0 5.6M18 14.3c1.7.6 2.9 2.2 3.2 4.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Joueurs</button>
@@ -1457,7 +1515,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   /* ----- Mode serveur (application hors de Claude) : base et lecture d'images passent par le serveur ----- */
   var SERVER = !!window.SNATCH_SERVER;
   /* Mode « local » : tout reste sur l'appareil (base IndexedDB), lecture des images par OCR gratuit sur l'appareil. Aucun serveur, aucune API payante. */
-  var BUILD = '04/10 18:11';
+  var BUILD = '04/10 18:29';
   /* Blocs repliables (Nouveautés, exemple de capture) : le choix est gardé sur l'appareil */
   function uiGet(key, def) {
     try { var o = JSON.parse(localStorage.getItem('snatch.ui') || '{}'); if (o && typeof o[key] === 'boolean') return o[key]; } catch (e) { /* ignore */ }
@@ -1468,7 +1526,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   }
   var CHEVRON = '<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-  /* Exemple « comment faire la capture » en haut d'Analyser et de Duel */
+  /* Exemple « comment faire la capture » en haut d'Adversaire et de Mon équipe */
   function mockPhone(kind) {
     var cardW = 26, cardH = 30, x0 = 17, y0 = 30, gx = 4, gy = 8, svg = '';
     svg += '<rect x="6" y="4" width="108" height="142" rx="12" fill="var(--surface)" stroke="var(--ink)" stroke-width="2"/>';
@@ -1498,8 +1556,9 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   /* Historique des mises à jour (affiché dans Réglages) : une ligne simple par amélioration, la plus récente en premier.
      À compléter à chaque nouvelle version. */
   var NEWS = [
+    { when: '4 octobre', title: 'Onglets plus clairs et duel animé', text: '« Analyser » devient « Adversaire ». Votre équipe a maintenant son onglet « Mon équipe », et l\'onglet « Duel » rassemble le verdict, les critiques et le détail des deux équipes, avec un affrontement animé (rejouable).' },
     { when: '4 octobre', title: 'La capture à côté des joueurs', text: 'Chaque joueur affiche la miniature de sa carte telle qu\'elle est sur votre capture (touchez-la pour l\'agrandir). Le bouton « Voir la capture à côté des joueurs » épingle la capture en haut de l\'écran pendant que vous faites défiler la liste, pour repérer les erreurs.' },
-    { when: '4 octobre', title: 'Exemple pour faire la capture', text: 'En haut d\'Analyser et de Duel, un schéma montre quelle capture envoyer. Vous pouvez le replier, comme l\'encart Nouveautés : votre choix est gardé.' },
+    { when: '4 octobre', title: 'Exemple pour faire la capture', text: 'En haut d\'Adversaire et de Mon équipe, un schéma montre quelle capture envoyer. Vous pouvez le replier, comme l\'encart Nouveautés : votre choix est gardé.' },
     { when: '4 octobre', title: 'Noms de joueurs mieux lus', text: 'Une liste d\'environ 51 000 joueurs aide l\'application à corriger un nom mal lu sur une capture, même si le joueur n\'est pas dans votre base. Leurs statistiques ne changent pas.' },
     { when: '4 octobre', title: 'Capture de profil et de lineup, quel que soit le fond', text: 'L\'équipe se lit aussi bien depuis le Lineup que depuis la page de profil, avec n\'importe quelle couleur de fond. Dans Duel, vous pouvez envoyer la capture de votre propre équipe.' },
     { when: '4 octobre', title: 'Compétences comme dans le jeu', text: 'Les compétences (Attacker, Captain, On Fire…) sont ajoutées à la carte avant le calcul 100 % / 25 %. Cela corrige l\'écart de 1 à 2 points avec le jeu.' },
@@ -2723,7 +2782,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     players: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 19c.5-3.2 2.8-5 5.5-5s5 1.8 5.5 5M16 6.2a3 3 0 0 1 0 5.6M18 14.3c1.7.6 2.9 2.2 3.2 4.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
     settings: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h9m4 0h1M5 17h3m4 0h7M5 12h1m4 0h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>'
   };
-  var TABS = [['analyse', 'Analyser'], ['duel', 'Duel'], ['import', 'Importer'], ['players', 'Joueurs'], ['settings', 'Réglages']];
+  var TABS = [['analyse', 'Adversaire'], ['mine', 'Mon équipe'], ['duel', 'Duel'], ['import', 'Importer'], ['players', 'Joueurs'], ['settings', 'Réglages']];
 
   /* ---------- Rendu : Analyser ---------- */
   function renderAnalyse() {
@@ -2939,7 +2998,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   }
 
 
-  /* ---------- Mon équipe (onglet Duel) ---------- */
+  /* ---------- Mon équipe (onglet Mon équipe) ---------- */
   var OPP = null;
   var MINE_KEY = LS_KEY + '_mine';
   function enterMine() {
@@ -3048,10 +3107,10 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     var mine = inMine(teamCalc);
     var h = '';
     if (!opp || !opp.calc) {
-      return '<section class="card alert warn"><p>Il manque l\'équipe adverse : envoyez d\'abord sa capture dans l\'onglet « Analyser ».</p><button class="btn" data-tab="analyse">Aller à Analyser</button></section>';
+      return '<section class="card alert warn"><p>Il manque l\'équipe adverse : envoyez d\'abord sa capture dans l\'onglet « Adversaire ».</p><button class="btn" data-tab="analyse">Aller à Adversaire</button></section>';
     }
     if (!mine || !mine.calc) {
-      return '<section class="card alert warn"><p>Ajoutez les joueurs de votre équipe ci-dessous (avec au moins un attaquant et un défenseur possibles comme joueur principal).</p></section>';
+      return '<section class="card alert warn"><p>Ajoutez les joueurs de votre équipe dans l\'onglet « Mon équipe » (avec au moins un attaquant et un défenseur possibles comme joueur principal).</p><button class="btn" data-tab="mine">Aller à Mon équipe</button></section>';
     }
     var cOpp = C.critChance(S.team.members), cMine = inMine(function () { return C.critChance(S.team.members); });
     h += '<section class="card duel"><h3>Critiques</h3><div class="vs"><div><small>Moi</small><b>' + fmt(Math.round(cMine.expected * 100) / 100) + '</b><small>en moyenne</small></div><span>contre</span><div><small>Adversaire</small><b>' + fmt(Math.round(cOpp.expected * 100) / 100) + '</b><small>en moyenne</small></div></div>' +
@@ -3064,12 +3123,11 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     var v = $('#duel-verdict'); if (v) v.innerHTML = duelVerdictHtml();
     var r = $('#mine-results'); if (r) r.innerHTML = inMine(renderResults);
   }
-  function renderDuel() {
-    var h = '<section class="hero"><div class="herohead"><h1>Duel</h1><div class="mascot" aria-hidden="true"></div></div>';
-    h += '<p class="sub">Votre équipe, avec ses compétences et ses bonus, contre l\'équipe adverse analysée dans l\'onglet « Analyser » : vos chances de gagner sont calculées.</p></section>';
-    h += '<div id="duel-verdict">' + duelVerdictHtml() + '</div>';
+  function renderMineTab() {
+    var h = '<section class="hero"><div class="herohead"><h1>Mon équipe</h1><div class="mascot" aria-hidden="true"></div></div>';
+    h += '<p class="sub">Envoyez la capture de votre équipe : ses joueurs, ses compétences, ses fonds et ses bonus sont gardés sur cet appareil. Le calcul face à l\'adversaire se fait dans l\'onglet « Duel ».</p></section>';
     h += howtoCard('mine');
-    h += '<div data-ctx="mine"><h2 class="sec">Mon équipe</h2>';
+    h += '<div data-ctx="mine">';
     h += inMine(function () {
       var t = S.team, x = '';
       x += '<p class="muted small">Envoyez une capture de votre équipe, ou ajoutez vos joueurs depuis votre base. Votre équipe est gardée en mémoire sur cet appareil et incluse dans la sauvegarde.</p>';
@@ -3090,6 +3148,91 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
       return x;
     });
     h += '</div>';
+    return h;
+  }
+
+  /* ---------- Duel : le verdict et toutes les infos des deux équipes ---------- */
+  function duelRow(m) {
+    var p = m.id ? S.db.players[m.id] : null, e = effStats(m);
+    var fd = C.MUTATIONS.filter(function (k) { return k.key === m.fond; })[0];
+    var sk = C.SKILLS.filter(function (k) { return m.skills && m.skills[k.key] > 0; }).map(function (k) { return '<span class="skchip">' + skImg(k.key) + esc(k.name) + (m.skills[k.key] > 1 ? ' x' + m.skills[k.key] : '') + '</span>'; }).join(' ');
+    var pos = (p && p.pos) || m.pos, club = (p && p.club) || m.club;
+    return '<li class="drow">' + (m.crop ? '<img class="dthumb" src="' + esc(m.crop) + '" alt="">' : '') + '<div class="dtxt"><b>' + esc(p ? p.name : m.name) + '</b>' +
+      '<small>' + [pos, club].filter(Boolean).map(esc).join(' · ') + (!m.id ? ' · notes estimées' : '') + '</small>' +
+      '<div class="chips tiny">' + STATS.map(function (s) { return chip(s, e[s], e.src[s]); }).join('') + '</div>' +
+      (fd || sk ? '<div class="dmeta">' + (fd ? '<span class="skchip">' + mutImg(fd.key) + esc(fd.name) + ' ' + fd.crit + ' %</span>' : '') + (sk ? ' ' + sk : '') + '</div>' : '') + '</div></li>';
+  }
+  function duelSide(label, tab, members, tc) {
+    function rg(o) { return o && o.min != null ? (o.min === o.max ? fmt(o.min) : fmt(o.min) + ' à ' + fmt(o.max)) : '?'; }
+    var sum = members.length ? plural(members.length, 'joueur', 'joueurs') + (tc && tc.calc ? ' · DEF ' + rg(tc.calc.def) + ' · ATK ' + rg(tc.calc.atk) : '') : 'aucun joueur pour l\'instant';
+    var h = '<details class="card more dside"><summary><b>' + esc(label) + '</b><small>' + sum + '</small></summary>';
+    if (members.length) h += '<ul class="dlist">' + members.map(duelRow).join('') + '</ul>';
+    h += '<button class="btn small ghost" data-tab="' + tab + '">Modifier cette équipe</button></details>';
+    return h;
+  }
+  function duelTeamsHtml() {
+    var opp = teamCalc(), mineT = inMine(teamCalc);
+    var h = '<h2 class="sec">Les deux équipes</h2>';
+    h += duelSide('Mon équipe', 'mine', S.mine.team.members, mineT);
+    h += duelSide('Équipe adverse', 'analyse', S.team.members, opp);
+    return h;
+  }
+  /* ---------- Duel : l'affrontement animé ---------- */
+  function duelArenaHtml() {
+    var opp = teamCalc(), mine = inMine(teamCalc);
+    S.arenaSigNow = null;
+    if (!opp || !opp.calc || !mine || !mine.calc) return '';
+    var o1 = C.duelOdds(mine.calc.atk, opp.calc.def), o2 = C.duelOdds(opp.calc.atk, mine.calc.def);
+    if (!o1 || !o2) return '';
+    var scale = Math.max(o1.attMax, o1.defMax, o2.attMax, o2.defMax, 1);
+    function rg(a, b) { return a === b ? fmt(a) : fmt(a) + ' à ' + fmt(b); }
+    function bar(side, label, lo, hi, delay) {
+      var w = Math.max(4, Math.round(((lo + hi) / 2) / scale * 100));
+      return '<div class="bar"><div class="brow"><span>' + label + '</span><b>' + rg(lo, hi) + '</b></div><div class="track"><i class="fill ' + side + '" style="--w:' + w + '%;--d:' + delay + 's"></i></div></div>';
+    }
+    function pct(good) { return Math.min(99, Math.max(1, Math.round(good * 100))); }
+    function verdict(mode, good) {
+      var cls = good >= 0.999 ? 'ok' : good <= 0.001 ? 'bad' : 'warn', txt;
+      if (mode === 'att') txt = good >= 0.999 ? 'Victoire assurée' : good <= 0.001 ? 'Pas de victoire possible' : '<span class="cnt" data-to="' + pct(good) + '">' + pct(good) + '</span> % de chances de gagner';
+      else txt = good >= 0.999 ? 'Vous résistez à coup sûr' : good <= 0.001 ? 'Vous ne résistez dans aucun cas' : 'Vous résistez dans <span class="cnt" data-to="' + pct(good) + '">' + pct(good) + '</span> % des cas';
+      return '<div class="rverdict verdict ' + cls + '">' + txt + '</div>';
+    }
+    var g1 = o1.cwin, g2 = o2.ctie + o2.close;
+    S.arenaSigNow = [Math.round(g1 * 1000), Math.round(g2 * 1000), o1.attMax, o1.defMax, o2.attMax, o2.defMax].join('/');
+    function fighter(cls, name, n) {
+      return '<div class="fighter ' + cls + '"><div class="shieldbox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 4 5.8v5.9c0 4.7 3.2 8.1 8 10 4.8-1.9 8-5.3 8-10V5.8z" fill="currentColor" fill-opacity=".16" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><span>' + n + '</span></div><b>' + name + '</b><small>' + plural(n, 'joueur', 'joueurs') + '</small></div>';
+    }
+    var h = '<section class="card arena" id="arena" aria-label="Le duel en un coup d\'œil"><div class="clash">' + fighter('me', 'Moi', S.mine.team.members.length) + '<div class="vsbadge" aria-hidden="true">VS</div>' + fighter('foe', 'Adversaire', S.team.members.length) + '</div>';
+    h += '<div class="round r1"><h3>Quand j\'attaque</h3>' + bar('mine', 'Mon attaque', o1.attMin, o1.attMax, 1.0) + bar('foe', 'Défense adverse', o1.defMin, o1.defMax, 1.25) + verdict('att', g1) + '</div>';
+    h += '<div class="round r2"><h3>Quand l\'adversaire m\'attaque</h3>' + bar('foe', 'Attaque adverse', o2.attMin, o2.attMax, 1.9) + bar('mine', 'Ma défense', o2.defMin, o2.defMax, 2.15) + verdict('def', g2) + '</div>';
+    h += '<button class="btn small ghost" data-act="arena-replay">▶ Rejouer l\'animation</button></section>';
+    return h;
+  }
+  function playArena() {
+    var a = document.getElementById('arena'); if (!a) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    a.classList.remove('go'); a.classList.add('pre'); void a.offsetWidth;
+    a.classList.remove('pre'); a.classList.add('go');
+    Array.prototype.forEach.call(a.querySelectorAll('.cnt'), function (el, i) {
+      var to = +el.getAttribute('data-to') || 0, t0 = null, delay = i ? 3000 : 1800;
+      el.textContent = '0';
+      function step(ts) {
+        if (t0 == null) t0 = ts;
+        var k = Math.min(1, (ts - t0 - delay) / 900);
+        if (k < 0) { requestAnimationFrame(step); return; }
+        el.textContent = String(Math.round(to * (1 - Math.pow(1 - k, 3))));
+        if (k < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    });
+  }
+
+  function renderDuel() {
+    var h = '<section class="hero"><div class="herohead"><h1>Duel</h1><div class="mascot" aria-hidden="true"></div></div>';
+    h += '<p class="sub">Votre équipe (onglet « Mon équipe ») contre l\'équipe adverse (onglet « Adversaire ») : vos chances de gagner, critiques compris.</p></section>';
+    h += duelArenaHtml();
+    h += '<div id="duel-verdict">' + duelVerdictHtml() + '</div>';
+    h += '<div id="duel-teams">' + duelTeamsHtml() + '</div>';
     return h;
   }
 
@@ -3340,6 +3483,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     var html = '';
     if (!S.ready) html = '<div class="boot"><div class="spin"></div><p>Chargement de votre base…</p></div>';
     else if (S.tab === 'analyse') html = renderAnalyse();
+    else if (S.tab === 'mine') html = renderMineTab();
     else if (S.tab === 'duel') html = renderDuel();
     else if (S.tab === 'import') html = renderImport();
     else if (S.tab === 'players') html = renderPlayers();
@@ -3348,6 +3492,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     var oldSc = v.querySelector('.shotscroll'), memo = oldSc ? { src: (oldSc.querySelector('img') || {}).src, top: oldSc.scrollTop, ratio: oldSc.scrollHeight ? oldSc.scrollTop / oldSc.scrollHeight : 0 } : null;
     v.innerHTML = html;
     placeShotScroll(v, memo);
+    if (S.tab === 'duel' && S.arenaSigNow && S.arenaKey !== S.arenaSigNow) { S.arenaKey = S.arenaSigNow; playArena(); }
     $$('.tabbar button').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === S.tab); b.setAttribute('aria-current', b.getAttribute('data-tab') === S.tab ? 'page' : 'false'); });
     renderStatus();
     window.scrollTo(0, y);
@@ -3390,7 +3535,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   function onClick(ev) {
     var el = ev.target.closest('[data-act],[data-tab]');
     if (!el) return;
-    if (el.hasAttribute('data-tab')) { S.tab = el.getAttribute('data-tab'); renderTab(); window.scrollTo(0, 0); return; }
+    if (el.hasAttribute('data-tab')) { S.tab = el.getAttribute('data-tab'); S.arenaKey = null; renderTab(); window.scrollTo(0, 0); return; }
     if (isMineEl(el)) {
       enterMine();
       try { handleAct(el); if (S.modal && !S.modal.ctx) S.modal.ctx = 'mine'; } finally { leaveMine(); }
@@ -3442,6 +3587,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
         S.team = { state: 'idle', members: [], err: '', img: null, ctl: null };
         S.bonus = { def: '', atk: '', clubDef: '', clubAtk: '', critDef: '', critAtk: '' }; S.mainsOff = {}; S.confirmOpp = false;
         renderTab(); toast('Analyse supprimée'); break;
+      case 'arena-replay': playArena(); break;
       case 'ui-toggle':
         uiSet(d.key, !uiGet(d.key, d.key === 'howto')); renderTab(); break;
       case 'theme':
