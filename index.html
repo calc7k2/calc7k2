@@ -1824,7 +1824,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
   /* ----- Mode serveur (application hors de Claude) : base et lecture d'images passent par le serveur ----- */
   var SERVER = !!window.SNATCH_SERVER;
   /* Mode « local » : tout reste sur l'appareil (base IndexedDB), lecture des images par OCR gratuit sur l'appareil. Aucun serveur, aucune API payante. */
-  var BUILD = '06/10 10:30';
+  var BUILD = '06/10 10:58';
   /* Blocs repliables (Nouveautés, exemple de capture) : le choix est gardé sur l'appareil */
   function uiGet(key, def) {
     try { var o = JSON.parse(localStorage.getItem('snatch.ui') || '{}'); if (o && typeof o[key] === 'boolean') return o[key]; } catch (e) { /* ignore */ }
@@ -1865,8 +1865,8 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
   /* Historique des mises à jour (affiché dans Réglages) : une ligne simple par amélioration, la plus récente en premier.
      À compléter à chaque nouvelle version. */
   var NEWS = [
-    { when: '6 octobre', title: 'Note estimée vérifiable et compétence Fortress', text: 'Quand une note est estimée, la fiche du joueur montre sa carte de la capture à côté de la carte du moins bon joueur du même poste utilisé pour l\'estimation (la carte est enregistrée quand le joueur vient d\'une vidéo). Nouvelle compétence Fortress (+4 DEF, +10 % de critique) : elle compte dans la défense et dans la chance de critique.' },
-    { when: '6 octobre', title: 'Vidéo, mot de passe et résultats simplifiés', text: 'Importer : vous pouvez maintenant envoyer une vidéo de la liste de joueurs (enregistrement d\'écran qui défile), de n\'importe quelle durée : chaque joueur est enregistré une seule fois, avec ses notes DEF/ATK et son poste ; ce qui est incertain reste vide. Réglages : un mot de passe optionnel, que vous choisissez et changez vous-même. Adversaire : résultats plus lisibles (total de base, bonus, puis critiques à part). Une note inconnue est remplacée par celle du moins bon joueur connu de son poste (toute la base), moins 1. Les noms ne se chevauchent plus dans Analyse.' },
+    { when: '6 octobre', title: 'Note estimée vérifiable et compétence Fortress', text: 'Quand une note est estimée, la fiche du joueur montre sa carte de la capture à côté de la carte du moins bon joueur du même poste utilisé pour l\'estimation. Nouvelle compétence Fortress (+4 DEF, +10 % de critique) : elle compte dans la défense et dans la chance de critique.' },
+    { when: '6 octobre', title: 'Mot de passe et résultats simplifiés', text: 'Réglages : un mot de passe optionnel, que vous choisissez et changez vous-même. Adversaire : résultats plus lisibles (total de base, bonus, puis critiques à part). Une note inconnue est remplacée par celle du moins bon joueur connu de son poste (toute la base), moins 1. Les noms ne se chevauchent plus dans Analyse.' },
     { when: '4 octobre', title: 'Bonus de club en haut de page', text: 'Le bonus de club est maintenant tout en haut d\'Adversaire et de Mon équipe. Les champs « Bonus DEF » et « Bonus ATK » inutiles ont été retirés. Les captures sont aussi mieux lues quand le bandeau du bas cache une rangée, quel que soit le fond.' },
     { when: '4 octobre', title: 'Analyse du match', text: 'Nouvel onglet « Analyse » (analyse de fin de match) : envoyez la capture de l\'écran de résultat d\'un duel et vous obtenez le verdict, le détail ligne par ligne, les critiques de chaque camp et ce qui aurait changé sans eux ou sans le bonus Club. Les matchs sont gardés pour calculer votre taux réel de critiques. Les Réglages sont maintenant sur la roue dentée en haut à droite.' },
     { when: '4 octobre', title: 'Onglets plus clairs et duel animé', text: '« Analyser » devient « Adversaire ». Votre équipe a maintenant son onglet « Mon équipe », et l\'onglet « Duel » rassemble le verdict, les critiques et le détail des deux équipes, avec un petit match animé : vos joueurs attaquent, tirent, marquent ou se font arrêter (rejouable, avec tirage au sort).' },
@@ -4069,365 +4069,6 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
   }
 
   /* ---------- Rendu : Importer ---------- */
-  /* ---------- Vidéo de joueurs : lecture automatique d'une liste de cartes qui défile ---------- */
-  var VID_KEY = 'snatch.vid';
-  var VID_W = 900; /* largeur de la lecture plein cadre (le reste se lit sur des découpes en pleine résolution) */
-  function vidWords(cv) {
-    var k = Math.min(1, VID_W / cv.width), sc = document.createElement('canvas');
-    sc.width = Math.round(cv.width * k); sc.height = Math.round(cv.height * k);
-    var cx = sc.getContext('2d'); cx.imageSmoothingQuality = 'high'; cx.drawImage(cv, 0, 0, sc.width, sc.height);
-    return matchRead(sc, 11).then(function (ws) {
-      return ws.map(function (w) { return { t: String(w.text || ''), x0: w.bbox.x0 / k, y0: w.bbox.y0 / k, x1: w.bbox.x1 / k, y1: w.bbox.y1 / k }; });
-    });
-  }
-  /* En-têtes « DEF n | ATK n » : on repère les mots DEF / ATK (même mal lus : « EF », « TK ») et on regroupe ceux d'une même rangée et d'une même colonne. */
-  function vidHeaders(words, W, H) {
-    var anchors = [];
-    words.forEach(function (w) {
-      var t = w.t.replace(/[^A-Za-z0-9]/g, '').toUpperCase(), cxm = (w.x0 + w.x1) / 2, cy = (w.y0 + w.y1) / 2, hh = w.y1 - w.y0;
-      if (hh > 0.03 * H || hh < 0.004 * H) return; /* les en-têtes sont petits */
-      var col = cxm < 0.5 * W ? 0 : 1, x0 = (col ? 0.534 : 0.042) * W, cw = 0.424 * W;
-      if (/^(DEF|DE|EF|DF|OEF|DEE|DEFI)$/.test(t)) anchors.push({ col: col, y: cy, kind: 'label' });
-      else if (/^(ATK|TK|ATX|ATH|ATN|ATI|ATE|ATKI|AK)$/.test(t)) anchors.push({ col: col, y: cy, kind: 'label' });
-      else if (/^\d{1,3}$/.test(t)) {
-        if (Math.abs(cxm - (x0 + 0.34 * cw)) < 0.12 * cw) anchors.push({ col: col, y: cy, kind: 'ndef' });
-        else if (Math.abs(cxm - (x0 + 0.75 * cw)) < 0.12 * cw) anchors.push({ col: col, y: cy, kind: 'natk' });
-      }
-    });
-    var heads = [];
-    anchors.sort(function (a, b) { return a.y - b.y; });
-    anchors.forEach(function (a) {
-      var h = heads.filter(function (g) { return g.col === a.col && Math.abs(g.y - a.y) < 0.012 * H; })[0];
-      if (!h) { h = { col: a.col, ys: [], kinds: {} }; heads.push(h); }
-      h.ys.push(a.y); h.kinds[a.kind] = 1; h.y = h.ys.reduce(function (s, v) { return s + v; }, 0) / h.ys.length;
-    });
-    return heads.filter(function (h) { return (h.kinds.ndef && h.kinds.natk) || ((h.kinds.ndef || h.kinds.natk) && h.kinds.label) || (h.kinds.label && Object.keys(h.kinds).length === 1 && h.ys.length >= 2); });
-  }
-  function vidGeom(h, W) { var w = 0.424 * W; return { x0: (h.col ? 0.534 : 0.042) * W, w: w }; }
-  function vidCrop(cv, x0, y0, x1, y1, outH) {
-    x0 = Math.max(0, Math.round(x0)); y0 = Math.max(0, Math.round(y0)); x1 = Math.min(cv.width, Math.round(x1)); y1 = Math.min(cv.height, Math.round(y1));
-    if (x1 - x0 < 12 || y1 - y0 < 8) return null;
-    var sc = outH / (y1 - y0), pad = 14, w = Math.round((x1 - x0) * sc), c = document.createElement('canvas');
-    c.width = w + 2 * pad; c.height = outH + 2 * pad;
-    var cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height); cx.imageSmoothingQuality = 'high';
-    cx.drawImage(cv, x0, y0, x1 - x0, y1 - y0, pad, pad, w, outH);
-    return c;
-  }
-  function vidThresh(c, th) {
-    var o = document.createElement('canvas'); o.width = c.width; o.height = c.height;
-    var cx = o.getContext('2d'); cx.drawImage(c, 0, 0);
-    var im = cx.getImageData(0, 0, o.width, o.height), p = im.data, i, g;
-    for (i = 0; i < p.length; i += 4) { g = (p[i] * 299 + p[i + 1] * 587 + p[i + 2] * 114) / 1000; p[i] = p[i + 1] = p[i + 2] = g < th ? 0 : 255; p[i + 3] = 255; }
-    cx.putImageData(im, 0, 0); return o;
-  }
-  function vidOcr(c, psm, wl) {
-    if (!c) return Promise.resolve('');
-    return ocrWorker().then(function (w) {
-      return w.setParameters({ tessedit_pageseg_mode: String(psm), tessedit_char_whitelist: wl || '' }).then(function () { return w.recognize(c); });
-    }).then(function (r) { return String((r && r.data && r.data.text) || ''); });
-  }
-  function vidNum(t) {
-    var m = String(t).replace(/[^A-Z0-9 ]/gi, ' ').match(/(\d{1,3})\s*$/);
-    var v = m ? +m[1] : null;
-    return v != null && v >= 10 && v <= 150 ? v : null;
-  }
-  function vidResolveName(variants) {
-    var m = C.matchOcrName(S.db.players, variants), raw = C.cleanOcrName(m.text) || '', xm = null;
-    if (m.sure) return { name: m.best.name, strength: 2, raw: raw };
-    if (m.letters >= 4) { try { xm = C.matchExtraNames(EXTRA_NAMES, variants); } catch (e) { xm = null; } }
-    if (xm && xm.best && xm.best.score >= 0.9 && xm.margin >= 0.095 && (!m.best || xm.best.score >= m.best.score + 0.04)) return { name: xm.best.name, strength: 1, raw: raw };
-    if (m.best && ((m.best.score >= 0.65 && m.margin >= 0.12) || (m.best.score >= 0.82 && m.margin >= 0.07))) return { name: m.best.name, strength: 1, raw: raw };
-    return { name: null, strength: 0, raw: raw };
-  }
-  function vidKey(store, r) {
-    if (r.name) return 'n:' + C.nameKey(r.name);
-    var nk = C.normText(r.raw), best = null;
-    if (nk.replace(/ /g, '').length < 5) return null;
-    Object.keys(store.p).forEach(function (k) { if (k.charAt(0) === 'r' && C.sim(k.slice(2), nk) >= 0.86) best = k; });
-    return best || 'r:' + nk;
-  }
-  function vidVote(map, v, n) { if (v == null) return; map[v] = (map[v] || 0) + (n || 1); }
-  function vidTop(map) {
-    var ks = Object.keys(map).sort(function (a, b) { return map[b] - map[a]; });
-    return ks.length ? { v: ks[0], n: map[ks[0]], second: ks[1] ? map[ks[1]] : 0 } : null;
-  }
-  function vidDone(o) { var d = vidTop(o.v.def), a = vidTop(o.v.atk), p = vidTop(o.pos); return !!(d && d.n >= 2 && a && a.n >= 2 && p && p.n >= 1); }
-  /* Une carte de l'image : lit les deux notes, le nom et le poste */
-  function vidCard(cv, words, h, store) {
-    var W = cv.width, H = cv.height, g = vidGeom(h, W), w = g.w, x0 = g.x0, hy = h.y;
-    if (hy - 0.09 * w < 0 || hy + 1.40 * w > 0.94 * H) return Promise.resolve(null); /* carte coupée en haut ou en bas */
-    var nz = { y0: hy + 1.03 * w, y1: hy + 1.46 * w };
-    var lines = [];
-    words.forEach(function (q) {
-      var cx = (q.x0 + q.x1) / 2, cy = (q.y0 + q.y1) / 2;
-      if (cx < x0 || cx > x0 + w || cy < nz.y0 || cy > nz.y1) return;
-      if (!/[A-Za-zÀ-ɏ]{2,}/.test(q.t)) return;
-      var l = lines.filter(function (L) { return Math.abs(L.cy - cy) < 0.5 * (q.y1 - q.y0); })[0];
-      if (!l) { l = { cy: cy, ws: [] }; lines.push(l); }
-      l.ws.push(q);
-    });
-    lines.sort(function (a, b) { return a.cy - b.cy; });
-    var wfText = lines.map(function (L) { return L.ws.sort(function (a, b) { return a.x0 - b.x0; }).map(function (q) { return q.t; }).join(' '); }).join(' ');
-    var wfNums = words.filter(function (q) { var cy = (q.y0 + q.y1) / 2, cx = (q.x0 + q.x1) / 2; return /^\d{1,3}$/.test(q.t) && Math.abs(cy - hy) < 0.05 * w && cx > x0 && cx < x0 + w; }).sort(function (a, b) { return a.x0 - b.x0; });
-    var wf = { def: null, atk: null };
-    if (wfNums.length >= 2) { wf.def = vidNum(wfNums[0].t); wf.atk = vidNum(wfNums[wfNums.length - 1].t); }
-    else if (wfNums.length === 1) { var onLeft = (wfNums[0].x0 + wfNums[0].x1) / 2 < x0 + 0.5 * w; wf[onLeft ? 'def' : 'atk'] = vidNum(wfNums[0].t); }
-    var quick = wfText.replace(/[^A-Za-zÀ-ɏ' -]/g, ' ').trim().length >= 4 ? vidResolveName([wfText]) : { name: null, strength: 0, raw: '' };
-    if (quick.strength >= 2) {
-      var qo = store.p['n:' + C.nameKey(quick.name)];
-      if (qo && vidDone(qo)) { qo.n++; qo.strong++; return Promise.resolve({ name: quick.name, again: true }); }
-    }
-    /* carte déjà bien lue plus tôt dans la vidéo : mêmes deux notes et un bout de nom qui ressemble → inutile de tout relire */
-    if (wf.def != null && wf.atk != null && wfText) {
-      var wt = C.normText(wfText).split(' ').filter(function (x) { return x.length >= 3; }), hit = null;
-      Object.keys(store.p).forEach(function (k) {
-        var q = store.p[k]; if (!q.name || !vidDone(q)) return;
-        var qd = vidTop(q.v.def), qa = vidTop(q.v.atk); if (+qd.v !== wf.def || +qa.v !== wf.atk) return;
-        var qt = C.normText(q.name).split(' ');
-        if (wt.some(function (x) { return qt.some(function (y) { return C.sim(x, y) >= 0.75; }); })) hit = q;
-      });
-      if (hit) { hit.n++; return Promise.resolve({ name: hit.name, again: true }); }
-    }
-    var obs = { variants: wfText ? [wfText] : [], def: null, atk: null, pos: null }, c;
-    var chain = Promise.resolve();
-    function readStat(xa, xb, xna, xnb) {
-      return vidOcr(vidCrop(cv, x0 + xa * w, hy - 0.075 * w, x0 + xb * w, hy + 0.075 * w, 80), 7, 'DEFATK0123456789 ').then(function (t) {
-        var v = vidNum(t); if (v != null) return v;
-        /* seconde chance : on ne découpe que le chiffre, plus gros */
-        return vidOcr(vidCrop(cv, x0 + xna * w, hy - 0.08 * w, x0 + xnb * w, hy + 0.08 * w, 110), 7, '0123456789').then(vidNum);
-      });
-    }
-    chain = chain.then(function () { return readStat(0.04, 0.54, 0.20, 0.56); }).then(function (v) { obs.def = v; });
-    chain = chain.then(function () { return readStat(0.50, 0.99, 0.60, 0.99); }).then(function (v) { obs.atk = v; });
-    /* Le nom est écrit en blanc à contour noir sur la photo, sur une ou deux lignes : on lit chaque ligne à part, en plusieurs contrastes */
-    [[1.10, 1.225], [1.215, 1.34]].forEach(function (bd) {
-      var parts = [];
-      chain = chain.then(function () {
-        var c = vidCrop(cv, x0 + 0.08 * w, hy + bd[0] * w, x0 + 0.92 * w, hy + bd[1] * w, 110);
-        if (!c) return null;
-        var variants = [null, 80, 110], q = Promise.resolve();
-        variants.forEach(function (th) {
-          q = q.then(function () { return vidOcr(th ? vidThresh(c, th) : c, 7, ''); }).then(function (t) { t = t.replace(/[^A-Za-z\u00C0-\u024F' -]+/g, ' ').replace(/\s+/g, ' ').trim(); if (t.replace(/[^A-Za-z]/g, '').length >= 2) parts.push(t); });
-        });
-        return q;
-      }).then(function () { if (parts.length) obs.lines = (obs.lines || []).concat([parts]); });
-    });
-    chain = chain.then(function () {
-      var L = obs.lines || [];
-      /* lectures candidates : chaque ligne seule, et les lignes assemblées (même contraste) */
-      var i;
-      for (i = 0; i < 3; i++) {
-        var seq = L.map(function (p) { return p[Math.min(i, p.length - 1)]; }).filter(Boolean);
-        if (seq.length) obs.variants.push(seq.join(' '));
-      }
-      L.forEach(function (p) { p.forEach(function (t) { obs.variants.push(t); }); });
-    });
-    chain = chain.then(function () {
-      var r = vidResolveName(obs.variants);
-      obs.r = r;
-      var key = vidKey(store, r); obs.key = key;
-      if (!key) return null;
-      var o = store.p[key];
-      var dbp = r.name ? S.db.players[(C.matchOcrName(S.db.players, [r.name]).best || {}).id] : null;
-      if (dbp && dbp.pos && C.normText(dbp.name) !== C.normText(r.name)) dbp = null;
-      if ((o && o.pos && vidTop(o.pos) && vidTop(o.pos).n >= 2) || (dbp && dbp.pos)) return null;
-      return readCardTag(cv, { x0: x0, x1: x0 + w, top: hy + 1.43 * w }).catch(function () { return null; }).then(function (tag) { obs.pos = tag; });
-    });
-    return chain.then(function () {
-      var r = obs.r, key = obs.key; if (!key) return { name: null };
-      var o = store.p[key] = store.p[key] || { name: r.name, raw: r.raw, n: 0, strong: 0, v: { def: {}, atk: {} }, pos: {} };
-      if (!o.img && dbh && (r.strength >= 1)) { var tc = vidCrop(cv, x0, hy - 0.09 * w, x0 + w, hy + 1.52 * w, 150); if (tc) { try { var t2 = document.createElement('canvas'); t2.width = 110; t2.height = Math.round(110 * tc.height / tc.width); t2.getContext('2d').drawImage(tc, 0, 0, t2.width, t2.height); o.img = t2.toDataURL('image/jpeg', 0.5); } catch (e) { /* ignore */ } } }
-      o.n++; if (r.strength >= 2) o.strong++;
-      o.vars = (o.vars || []).concat(obs.variants).slice(-30);
-      if (r.name && !o.name) o.name = r.name;
-      vidVote(o.v.def, obs.def, 1); vidVote(o.v.atk, obs.atk, 1);
-      if (obs.def != null && obs.def === wf.def) vidVote(o.v.def, obs.def, 1);
-      if (obs.atk != null && obs.atk === wf.atk) vidVote(o.v.atk, obs.atk, 1);
-      if (obs.pos) vidVote(o.pos, obs.pos, 1);
-      return { name: r.name || r.raw, def: obs.def, atk: obs.atk, pos: obs.pos };
-    });
-  }
-  function vidFrame(cv, store) {
-    return vidWords(cv).then(function (words) {
-      var heads = vidHeaders(words, cv.width, cv.height), seen = 0, chain = Promise.resolve();
-      heads.forEach(function (h) { chain = chain.then(function () { return vidCard(cv, words, h, store); }).then(function (x) { if (x) seen++; }); });
-      return chain.then(function () { store.frames = (store.frames || 0) + 1; return { heads: heads.length, seen: seen }; });
-    });
-  }
-  function vidRows(store) {
-    var ents = Object.keys(store.p).map(function (k) { return store.p[k]; });
-    function statOf(o, s) { var t = vidTop(o.v[s]); return t && t.n >= 2 ? +t.v : null; }
-    function tokSim(x, y) {
-      var tx = C.normText(x).split(' ').filter(function (t) { return t.length >= 3; }), ty = C.normText(y).split(' ').filter(function (t) { return t.length >= 3; }), b = 0;
-      tx.forEach(function (p) { ty.forEach(function (q) { var s = C.simFlex ? C.simFlex(p, q) : C.sim(p, q); if (s > b) b = s; }); });
-      return b;
-    }
-    function textOf(o) { return (o.name ? o.name + ' ' : '') + (o.raw || '') + ' ' + (o.vars || []).join(' '); }
-    function compat(a, b) {
-      var d1 = statOf(a, 'def'), d2 = statOf(b, 'def'), a1 = statOf(a, 'atk'), a2 = statOf(b, 'atk');
-      if ((d1 != null && d2 != null && d1 !== d2) || (a1 != null && a2 != null && a1 !== a2)) return false;
-      return (d1 != null && d1 === d2) || (a1 != null && a1 === a2) || (d1 == null && a1 == null) || (d2 == null && a2 == null);
-    }
-    function absorb(into, o) {
-      into.n += o.n; into.strong += o.strong; if (!into.img && o.img) into.img = o.img; into.vars = (into.vars || []).concat(o.vars || []).slice(-60);
-      ['def', 'atk'].forEach(function (s) { Object.keys(o.v[s]).forEach(function (v) { vidVote(into.v[s], v, o.v[s][v]); }); });
-      Object.keys(o.pos).forEach(function (v) { vidVote(into.pos, v, o.pos[v]); });
-      o.merged = true;
-    }
-    var anchored = ents.filter(function (o) { return o.name && (o.strong >= 1 || o.n >= 2); }), loose = ents.filter(function (o) { return anchored.indexOf(o) < 0; });
-    /* 1) lectures isolées d'un joueur déjà sûr : mêmes notes lues, nom proche → rattachées */
-    loose.forEach(function (o) {
-      var best = null, bs = 0, second = 0;
-      anchored.forEach(function (q) {
-        if (!compat(o, q) || (statOf(o, 'def') == null && statOf(o, 'atk') == null)) return;
-        var s = tokSim(textOf(o), q.name); if (s > bs) { second = bs; bs = s; best = q; } else if (s > second) second = s;
-      });
-      if (best && bs >= 0.6 && bs - second >= 0.06) absorb(best, o);
-    });
-    /* 2) lectures floues d'une même carte : on les regroupe (mêmes notes, mots qui se ressemblent), puis on cherche le nom sur l'ensemble des lectures */
-    var rest = loose.filter(function (o) { return !o.merged; }), groups = [];
-    rest.forEach(function (o) {
-      var g = groups.filter(function (G) { return G.some(function (q) { return compat(o, q) && (statOf(o, 'def') != null || statOf(o, 'atk') != null || statOf(q, 'def') != null || statOf(q, 'atk') != null) && tokSim(textOf(o), textOf(q)) >= 0.6; }); })[0];
-      if (g) g.push(o); else groups.push([o]);
-    });
-    var rows = [], lost = [];
-    function emit(o) {
-      var d = vidTop(o.v.def), a = vidTop(o.v.atk), p = vidTop(o.pos);
-      return { name: o.name || o.raw, def: d && d.n >= 2 ? +d.v : null, atk: a && a.n >= 2 ? +a.v : null, pos: p && p.n >= 1 && p.n > p.second ? p.v : null, unreadable: !(o.strong >= 1 || (o.name && o.n >= 2)), img: o.img || null };
-    }
-    anchored.forEach(function (o) { rows.push(emit(o)); });
-    groups.forEach(function (G) {
-      var m = G[0];
-      G.slice(1).forEach(function (o) { absorb(m, o); });
-      if (G.length < 2 && m.n < 2) { var e0 = emit(m); lost.push({ raw: m.name || m.raw, def: e0.def, atk: e0.atk }); return; }
-      var r = vidResolveName((m.vars || []).slice(-40));
-      if (r.name && r.strength >= 1) { m.name = r.name; rows.push(emit(m)); }
-      else { var e1 = emit(m); lost.push({ raw: m.name || m.raw, def: e1.def, atk: e1.atk }); }
-    });
-    return { rows: rows, lost: lost };
-  }
-  /* Analyse du défilement : on ne lit que lorsque l'écran a vraiment bougé (réduit le travail, quelle que soit la durée) */
-  var VS_W = 40, VS_H = 128;
-  function vidSig(cv, c2) {
-    c2.width = VS_W; c2.height = VS_H;
-    var cx = c2.getContext('2d', { willReadFrequently: true }); cx.drawImage(cv, 0, 0, VS_W, VS_H);
-    var d = cx.getImageData(0, 0, VS_W, VS_H).data, g = new Float32Array(VS_W * VS_H), i;
-    for (i = 0; i < g.length; i++) g[i] = (d[i * 4] * 299 + d[i * 4 + 1] * 587 + d[i * 4 + 2] * 114) / 1000;
-    return g;
-  }
-  function vidSad(a, b, dy) {
-    var y0 = Math.round(0.14 * VS_H), y1 = Math.round(0.84 * VS_H), s = 0, n = 0, x, y;
-    for (y = y0; y < y1; y++) { var y2 = y + dy; if (y2 < 0 || y2 >= VS_H) continue; for (x = 0; x < VS_W; x++) { s += Math.abs(a[y * VS_W + x] - b[y2 * VS_W + x]); n++; } }
-    return n ? s / n : 255;
-  }
-  function vidShift(a, b) {
-    var s0 = vidSad(a, b, 0);
-    if (s0 < 2.2) return { still: true, dy: 0 };
-    var best = s0, by = 0, dy;
-    for (dy = -50; dy <= 50; dy++) { if (!dy) continue; var s = vidSad(a, b, dy); if (s < best) { best = s; by = dy; } }
-    return { still: false, dy: by, ok: by !== 0 && best < 0.75 * s0 && best < 18, s0: s0, best: best };
-  }
-  function vidSeek(v, t) {
-    return new Promise(function (res, rej) {
-      var done = false, to = setTimeout(function () { if (!done) { done = true; v.removeEventListener('seeked', ok); rej(new Error('seek')); } }, 12000);
-      function ok() { if (done) return; done = true; clearTimeout(to); v.removeEventListener('seeked', ok); res(); }
-      v.addEventListener('seeked', ok); v.currentTime = t;
-    });
-  }
-  function vidClock(sec) { sec = Math.max(0, Math.round(sec)); var h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60; return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + (s < 10 ? '0' : '') + s; }
-  function vidSaveState(fileKey, t, store) { try { localStorage.setItem(VID_KEY, JSON.stringify({ key: fileKey, t: t, store: store })); } catch (e) { /* ignore */ } }
-  function vidLoadState(fileKey) { try { var s = JSON.parse(localStorage.getItem(VID_KEY) || 'null'); return s && s.key === fileKey ? s : null; } catch (e) { return null; } }
-  function readVideo(file, job) {
-    var fileKey = file.name + '|' + file.size + '|' + (file.lastModified || 0);
-    var v = document.createElement('video'), url = URL.createObjectURL(file), sig = document.createElement('canvas'), full = document.createElement('canvas');
-    v.muted = true; v.playsInline = true; v.preload = 'auto'; v.setAttribute('playsinline', ''); v.src = url;
-    var store = { p: {}, frames: 0 }, t = 0, lock = null, t0 = Date.now(), nOcr = 0;
-    var prev = null, lastOcr = null, acc = 0, step = 0.5, dur = 0;
-    function cleanup() { try { URL.revokeObjectURL(url); } catch (e) { /* ignore */ } try { if (lock && lock.release) lock.release(); } catch (e) { /* ignore */ } v.removeAttribute('src'); try { v.load(); } catch (e) { /* ignore */ } }
-    function found() { return Object.keys(store.p).length; }
-    function progress() {
-      var el = (Date.now() - t0) / 1000, eta = t > 5 && el > 20 ? ' · reste environ ' + vidClock(el * (dur - t) / Math.max(1, t - (store.t0 || 0))) : '';
-      job.progress = 'Vidéo ' + vidClock(t) + ' sur ' + vidClock(dur) + ' · ' + plural(found(), 'joueur trouvé', 'joueurs trouvés') + eta + '. Gardez l\'écran allumé et l\'application ouverte.';
-      var e = document.querySelector('[data-job="' + job.id + '"] .busy span'); if (e) e.textContent = job.progress; else renderTab();
-    }
-    return new Promise(function (res, rej) {
-      v.onloadedmetadata = res; v.onerror = function () { rej(new Error('Cette vidéo ne peut pas être lue par ce navigateur (format ou codec non pris en charge).')); };
-      setTimeout(function () { rej(new Error('La vidéo met trop de temps à s\'ouvrir.')); }, 60000);
-    }).then(function () {
-      dur = v.duration;
-      if (!isFinite(dur) || dur <= 0) throw new Error('Durée de la vidéo illisible.');
-      try { if (navigator.wakeLock && navigator.wakeLock.request) navigator.wakeLock.request('screen').then(function (l) { lock = l; }, function () { /* ignore */ }); } catch (e) { /* ignore */ }
-      var st = vidLoadState(fileKey);
-      if (st && st.t > 1 && st.store) { store = st.store; t = st.t; job.notes.push('Reprise de la lecture à ' + vidClock(t) + ' (' + plural(found(), 'joueur déjà trouvé', 'joueurs déjà trouvés') + ').'); }
-      store.t0 = t;
-      var lastSave = Date.now();
-      function loop() {
-        if (job.ctl.signal.aborted || t >= dur - 0.05) return Promise.resolve();
-        return vidSeek(v, Math.min(t, dur - 0.05)).then(function () {
-          var W = v.videoWidth, H = v.videoHeight, k = Math.min(1, 2800 / Math.max(W, H));
-          full.width = Math.round(W * k); full.height = Math.round(H * k);
-          full.getContext('2d').drawImage(v, 0, 0, full.width, full.height);
-          var cur = vidSig(full, sig), doOcr = false, sh = null;
-          if (!prev) { doOcr = true; step = 0.4; }
-          else {
-            sh = vidShift(prev, cur);
-            if (sh.still) { if (acc > 0) { doOcr = true; } step = Math.min(step * 1.7, 2); }
-            else if (sh.ok) {
-              acc += Math.abs(sh.dy) / VS_H; if (acc >= 0.10) doOcr = true;
-              step = Math.max(0.08, Math.min(1, step * Math.max(0.5, Math.min(1.4, 0.06 / (Math.abs(sh.dy) / VS_H)))));
-            } else {
-              /* écran très différent (changement de page, défilement trop rapide) : on lit si l'image est nouvelle */
-              acc += 0.05; if (acc >= 0.10 || !lastOcr) doOcr = true; step = 0.25;
-            }
-          }
-          prev = cur;
-          var p = Promise.resolve();
-          if (doOcr) {
-            acc = 0; lastOcr = cur; nOcr++;
-            p = vidFrame(full, store);
-          }
-          return p.then(function () {
-            t += step; progress();
-            if (Date.now() - lastSave > 20000) { vidSaveState(fileKey, t, store); lastSave = Date.now(); }
-            return new Promise(function (r) { setTimeout(r, 0); });
-          });
-        }).then(loop);
-      }
-      return loop();
-    }).then(function () {
-      var done = !job.ctl.signal.aborted;
-      if (done) { try { localStorage.removeItem(VID_KEY); } catch (e) { /* ignore */ } } else vidSaveState(fileKey, t, store);
-      cleanup();
-      var out = vidRows(store);
-      job.vidLost = out.lost;
-      if (!done) job.notes.push('Lecture arrêtée à ' + vidClock(t) + ' sur ' + vidClock(dur) + '. Relancez la même vidéo pour reprendre là où vous vous êtes arrêté.');
-      job.notes.push(plural(nOcr, 'image analysée', 'images analysées') + ' sur ' + vidClock(dur) + ' de vidéo : ' + plural(out.rows.length, 'joueur reconnu', 'joueurs reconnus') + ', chacun une seule fois.');
-      if (out.lost.length) job.warnings.push(plural(out.lost.length, 'carte', 'cartes') + ' dont le nom n\'a pas pu être identifié sûrement (ignorée' + (out.lost.length > 1 ? 's' : '') + ', rien n\'est inventé) : ' + out.lost.slice(0, 8).map(function (x) { return '« ' + x.raw + ' »' + (x.def != null || x.atk != null ? ' (' + (x.def != null ? 'DEF ' + x.def : '') + (x.def != null && x.atk != null ? ', ' : '') + (x.atk != null ? 'ATK ' + x.atk : '') + ')' : ''); }).join(', ') + (out.lost.length > 8 ? '…' : '') + '.');
-      var nStat = out.rows.filter(function (r) { return r.def == null || r.atk == null; }).length;
-      if (nStat) job.warnings.push(plural(nStat, 'joueur', 'joueurs') + ' avec une note non lue de façon sûre : elle reste vide plutôt que devinée.');
-      job.warnings.push('Vidéo lue sur l\'appareil : seules les notes DEF/ATK, le poste et le nom sont pris en compte ; tout ce qui est incertain est laissé vide.');
-      return out.rows;
-    }, function (e) { cleanup(); throw e; });
-  }
-  function startVideoImport(file) {
-    var job = { id: uid(), name: file.name, kind: 'Vidéo', status: 'reading', rows: [], notes: [], warnings: [], err: '', mode: 'both', hint: null, noFloors: true,
-      decisions: {}, keepOld: {}, saved: null, ctl: new AbortController(), progress: 'Ouverture de la vidéo…' };
-    S.jobs.unshift(job); renderTab();
-    readVideo(file, job).then(function (rows) {
-      job.rows = rows || [];
-      if (!job.rows.length) { job.status = 'error'; job.err = 'Aucun joueur lisible dans cette vidéo. Il faut la liste des cartes (avec « DEF » et « ATK » au-dessus de chaque carte) bien visible à l\'écran.'; return; }
-      job.status = 'ready';
-      /* aucune valeur déjà enregistrée n'est écrasée par une lecture vidéo */
-      var rep = jobReport(job);
-      rep.conflicts.forEach(function (c) { job.keepOld[c.i + ':' + c.stat] = true; });
-      rep = jobReport(job);
-      if (!rep.toconfirm && !rep.conflicts.length) saveJob(job);
-      else job.warnings.push('Vérifiez les éléments « à confirmer » ci-dessous, puis enregistrez.');
-    }).catch(function (e) {
-      job.status = 'error'; job.err = e && e.message ? e.message : 'Lecture de la vidéo impossible.';
-    }).then(function () { renderTab(); });
-  }
-
   function renderImport() {
     var h = '<section class="hero"><h1>Importer des statistiques</h1>';
     h += '<p class="sub">Classements ou tableaux en CSV, Excel, PDF ou image. Un fichier peut ne contenir que la défense ou que l\'attaque : les joueurs sont complétés, jamais écrasés.</p>';
@@ -4438,7 +4079,6 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
     h += '</div><p class="muted small">« Auto » repère DEF ou ATK d\'après les titres ou le nom du fichier. Si ce n\'est pas clair, l\'application vous le demande.</p>';
     h += '<label class="btn primary big" for="file-input">' + ICONS.import + '<span>Choisir des fichiers</span></label>';
     h += '<input id="file-input" type="file" multiple accept=".csv,.tsv,.txt,.xlsx,.xls,.xlsm,.ods,.pdf,image/*" hidden>';
-    if (LOCAL) h += '<label class="btn big" for="video-input">' + ICONS.import + '<span>Importer une vidéo de joueurs</span></label><input id="video-input" type="file" accept="video/*" hidden><p class="muted small">Enregistrez votre écran en faisant défiler la liste de cartes (avec « DEF » et « ATK » au-dessus de chaque carte). Chaque joueur n\'est enregistré qu\'une fois, quelle que soit la durée de la vidéo ; rien n\'est inventé.</p>';
     h += '</section>';
     h += '<details class="card more"><summary>Coller du texte</summary><label class="field"><span>Un joueur par ligne, par exemple « Paul Dupont 82 »</span><textarea id="paste-text" rows="5" placeholder="1. Paul Dupont   82"></textarea></label><button class="btn" data-act="paste-go">Lire ce texte</button></details>';
     if (S.jobs.length) h += '<h2 class="sec">En cours</h2>' + S.jobs.map(renderJob).join('');
@@ -5013,7 +4653,6 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
     else if (el.id === 'match-input' && el.files && el.files[0]) { analyseMatchShot(el.files[0]); el.value = ''; }
     else if (el.getAttribute && el.getAttribute('data-mf')) { matchEdit(el); }
     else if (el.id === 'mine-shot-input' && el.files && el.files[0]) { analyseScreenshot(el.files[0], false, true); el.value = ''; }
-    else if (el.id === 'video-input' && el.files && el.files[0]) { startVideoImport(el.files[0]); el.value = ''; }
     else if (el.id === 'file-input' && el.files && el.files.length) { startImport(Array.prototype.slice.call(el.files)); el.value = ''; }
     else if (el.id === 'backup-input' && el.files && el.files[0]) { restoreBackup(el.files[0]); el.value = ''; }
     else if (el.getAttribute('data-field') === 'main' && isMineEl(el)) {
@@ -5037,7 +4676,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
     renderTab();
     initStorage().then(function () { return loadMine(); }).then(function () { return loadOpp(); }).then(function () { S.ready = true; renderTab(); }).catch(function () { S.ready = true; renderTab(); });
   }
-  window.SnatchApp = { skMask: skMask, readCardTag: readCardTag, vidCrop: vidCrop, vidGeom: vidGeom, vidFrame: vidFrame, vidRows: vidRows, vidHeaders: vidHeaders, vidWords: vidWords, startVideoImport: startVideoImport, fondThumb: fondThumb, fondFeatures: fondFeatures, fondPredict: fondPredict, readCardFond: readCardFond, nameCanvas: nameCanvas, ocrText: ocrText, readCardSkills: readCardSkills, skSlots: skSlots, findCardStrips: findCardStrips, findProfileCards: findProfileCards, findCardsByNames: findCardsByNames, completeGrid: completeGrid, tagCanvas: tagCanvas, bitmapCanvas: bitmapCanvas, S: S, C: C, startImport: startImport, saveJob: saveJob, jobReport: jobReport, renderTab: renderTab, analyseScreenshot: analyseScreenshot, teamCalc: teamCalc, effStats: effStats, boot: boot };
+  window.SnatchApp = { skMask: skMask, readCardTag: readCardTag, fondThumb: fondThumb, fondFeatures: fondFeatures, fondPredict: fondPredict, readCardFond: readCardFond, nameCanvas: nameCanvas, ocrText: ocrText, readCardSkills: readCardSkills, skSlots: skSlots, findCardStrips: findCardStrips, findProfileCards: findProfileCards, findCardsByNames: findCardsByNames, completeGrid: completeGrid, tagCanvas: tagCanvas, bitmapCanvas: bitmapCanvas, S: S, C: C, startImport: startImport, saveJob: saveJob, jobReport: jobReport, renderTab: renderTab, analyseScreenshot: analyseScreenshot, teamCalc: teamCalc, effStats: effStats, boot: boot };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
 
