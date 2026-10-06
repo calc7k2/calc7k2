@@ -193,9 +193,9 @@ tfoot tr.total td { font-weight: 700; font-size: 17px; border-top: 2px solid var
 tfoot tr.crit td { color: var(--muted); font-style: italic; border-bottom: 0; }
 
 /* Importation */
-.job .jh { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
-.job .jh b { overflow-wrap: anywhere; }
-.job .jh small { display: block; }
+.job .jh, .sheetcard .jh { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.job .jh b, .sheetcard .jh b { overflow-wrap: anywhere; }
+.job .jh small, .sheetcard .jh small { display: block; }
 .x { width: 40px; height: 40px; border-radius: 12px; border: 1.5px solid var(--line); background: transparent; font-size: 22px; line-height: 1; cursor: pointer; flex: none; }
 .confirm { border-top: 1px solid var(--warn-line); padding-top: 8px; margin-top: 8px; }
 .clabel { margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -496,6 +496,18 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
 .estimgs figcaption { font-size: 12px; color: var(--muted); }
 .estnoimg { width: 110px; min-height: 80px; display: grid; place-items: center; text-align: center; padding: 6px; font-size: 12px; color: var(--muted); border: 1px dashed var(--line); border-radius: 10px; }
 
+.rarrow .btn{display:inline-flex;align-items:center;gap:6px}
+.rdot{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none}
+.r-legendary{background:linear-gradient(135deg,#2fd2b0,#a6e05a)}
+.r-goat{background:linear-gradient(135deg,#ff9a3c,#ef4f4f)}
+.r-star{background:#f0647c}
+.r-pro{background:#a9a6ee}
+.r-common{background:#9aa5b8}
+.rarbadge{display:inline-flex;align-items:center;gap:5px;font-size:.78rem;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--chip-bg,rgba(127,127,127,.14))}
+
+.rarrow .btn:not(.ghost){background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.rarjob{margin:10px 0}
+
 </style></head><body>
 <header class="top"><div class="brand">Mon <span>calculateur</span></div><div id="status" class="status" role="status"></div><button class="gear" data-tab="settings" aria-label="Réglages"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h9m4 0h1M5 17h3m4 0h7M5 12h1m4 0h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button></header>
 <main id="view"></main>
@@ -621,6 +633,36 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
     return isFinite(n) ? n : null;
   }
 
+
+  /* ---------- Raretés des cartes (de la plus forte à la plus faible) ---------- */
+
+  var RARITIES = [
+    { key: 'legendary', name: 'Legendary' }, { key: 'goat', name: 'GOAT' }, { key: 'star', name: 'Star' },
+    { key: 'pro', name: 'Pro' }, { key: 'common', name: 'Common' }
+  ];
+  function rarKey(s) {
+    if (s == null) return null;
+    var t = normText(s);
+    if (!t) return null;
+    if (/(^| )legend\w*( |$)/.test(t)) return 'legendary';
+    if (/(^| )goat( |$)/.test(t)) return 'goat';
+    if (/(^| )(star|etoile\w*)( |$)/.test(t)) return 'star';
+    if (/(^| )pro( |$)/.test(t)) return 'pro';
+    if (/(^| )(common|commune?)( |$)/.test(t)) return 'common';
+    return null;
+  }
+  function rarName(k) { var r = RARITIES.filter(function (x) { return x.key === k; })[0]; return r ? r.name : ''; }
+  /* Couleur moyenne (teinte en degrés, saturation, luminosité 0..1) d'une icône ou du cadre d'une carte → rareté.
+     Legendary (vert/turquoise) et GOAT (orange) sont fiables ; Star, Pro et Common se ressemblent davantage : sure = false. */
+  function rarFromColor(h, s, v) {
+    if (h == null || s == null || s < 0.08) return null;
+    if (h >= 80 && h <= 200 && s >= 0.2) return { key: 'legendary', sure: true };
+    if (h >= 12 && h <= 62 && s >= 0.28) return { key: 'goat', sure: true };
+    if ((h < 12 || h >= 320) && s >= 0.2) return { key: 'star', sure: false };
+    if (h >= 195 && h <= 300 && s < 0.45) return { key: h >= 232 || v >= 0.95 ? 'pro' : 'common', sure: false };
+    return null;
+  }
+
   /* ---------- Index et correspondance ---------- */
 
   function buildIndex(players) {
@@ -650,6 +692,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
     }
   }
 
+  function clubCompat(a, b) { return !normText(a) || !normText(b) || sameClub(a, b); }
   function sameClub(a, b) {
     var x = normText(a), y = normText(b);
     return !!x && !!y && x === y;
@@ -664,11 +707,17 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
     var cands = [];
 
     if (exact.length === 1 && !forceConfirm) {
-      return { status: 'exact', id: exact[0], candidates: [] };
+      return { status: 'exact', id: exact[0], candidates: [], sibs: exact.slice() };
+    }
+    /* même joueur en plusieurs raretés (une fiche par rareté) : ce n'est pas un doublon */
+    if (exact.length > 1 && !forceConfirm) {
+      var rs = exact.map(function (id) { return players[id].rar || ''; });
+      var distinctRar = rs.every(function (r, i) { return rs.indexOf(r) === i; }) && exact.every(function (id) { return clubCompat(players[id].club, players[exact[0]].club); });
+      if (distinctRar) return { status: 'exact', id: exact[0], candidates: [], sibs: exact.slice() };
     }
     if (exact.length > 1 && !forceConfirm) {
       var byClub = exact.filter(function (id) { return sameClub(players[id].club, club); });
-      if (byClub.length === 1) return { status: 'exact', id: byClub[0], candidates: [] };
+      if (byClub.length === 1) return { status: 'exact', id: byClub[0], candidates: [], sibs: byClub.slice() };
       exact.forEach(function (id) { cands.push({ id: id, score: 1, why: 'même nom' }); });
       return { status: 'confirm', candidates: cands };
     }
@@ -727,7 +776,30 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
     return JSON.parse(JSON.stringify(p));
   }
 
-  /* rows : [{name, def, atk, pos, club, unreadable}]
+
+  /* Parmi les fiches d'un même joueur (une par rareté), choisit celle de la rareté demandée.
+     how : 'same' (bonne rareté) · 'legacy' (fiche sans rareté, ancienne) · 'other' (il n'existe que d'autres raretés) · 'any' (rareté non précisée) */
+  function sibsOf(players, id) {
+    var p = players[id];
+    if (!p) return [];
+    var key = nameKey(p.name);
+    return Object.keys(players).filter(function (x) { return x === id || (nameKey(players[x].name) === key && clubCompat(players[x].club, p.club)); });
+  }
+  function chooseSibling(players, ids, rar) {
+    var list = ids.filter(function (i) { return players[i]; });
+    if (!list.length) return { id: null, how: 'none' };
+    if (rar) {
+      var same = list.filter(function (i) { return players[i].rar === rar; })[0];
+      if (same) return { id: same, how: 'same' };
+      var legacy = list.filter(function (i) { return !players[i].rar; })[0];
+      if (legacy) return { id: legacy, how: 'legacy' };
+      return { id: list[0], how: 'other' };
+    }
+    var untagged = list.filter(function (i) { return !players[i].rar; })[0];
+    return { id: untagged || list[0], how: 'any' };
+  }
+
+  /* rows : [{name, def, atk, pos, club, rar, unreadable}]
      decisions : { [rowIndex]: 'new' | 'skip' | playerId }
      keepOld   : { 'rowIndex:stat': true }
      meta      : { file, date }
@@ -767,11 +839,24 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
         else { item.result = 'toconfirm'; report.toconfirm++; return; }
       }
 
+      /* même joueur, plusieurs raretés : on met à jour la fiche de la bonne rareté, sinon on en crée une */
+      var from = null, adopt = false;
+      if (target !== 'new') {
+        var cs = chooseSibling(view, sibsOf(view, target), row.rar || null);
+        if (row.rar && cs.how === 'other') { from = view[cs.id]; target = 'new'; }
+        else if (row.rar && cs.how === 'legacy') {
+          var q = view[cs.id];
+          var clash = STATS.some(function (s) { return row[s] != null && q[s] != null && q[s] !== row[s]; });
+          if (clash) { from = q; target = 'new'; } else { target = cs.id; adopt = true; }
+        } else target = cs.id;
+      }
+
       var p, isNew = false;
       if (target === 'new') {
         isNew = true;
-        p = { id: randomId(meta.chunks), name: String(row.name).trim().replace(/\s+/g, ' '), pos: row.pos || null,
-          club: row.club || null, def: null, atk: null, src: {}, hist: [], created: date };
+        p = { id: randomId(meta.chunks), name: from ? from.name : String(row.name).trim().replace(/\s+/g, ' '), pos: row.pos || (from && from.pos) || null,
+          club: row.club || (from && from.club) || null, def: null, atk: null, src: {}, hist: [], created: date };
+        if (row.rar) p.rar = row.rar;
         work[p.id] = p;
         view[p.id] = p;
         indexAdd(idx, p);
@@ -782,8 +867,10 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
         if (!p.src) p.src = {};
         if (!p.hist) p.hist = [];
       }
+      if (adopt && row.rar) p.rar = row.rar;
       item.id = p.id;
       item.name = p.name;
+      item.rar = p.rar || null;
 
       var filled = 0, changed = 0, same = 0;
       STATS.forEach(function (s) {
@@ -834,6 +921,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
     if (d && !a) return 'def';
     if (a && !d) return 'atk';
     if (d && a) return null;
+    if (/^(rarete|rarity|tier|niveau de rarete|rarete de la carte|card rarity)$/.test(t)) return 'rar';
     if (/^(pos|position|poste|role)$/.test(t)) return 'pos';
     if (/^(club|equipe|team|squad)$/.test(t)) return 'club';
     if (/^(rang|rank|classement|place|n|no|num|numero)$/.test(t) || String(cell).trim() === '#') return 'rank';
@@ -936,6 +1024,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
       }
       if (map.pos != null) rec.pos = normPos(row[map.pos]);
       if (map.club != null) rec.club = cellStr(row[map.club]) || null;
+      if (map.rar != null) rec.rar = rarKey(row[map.rar]);
       out.rows.push(rec);
     }
     return out;
@@ -1163,7 +1252,8 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
         def: parseNum(o.def != null ? o.def : o.DEF),
         atk: parseNum(o.atk != null ? o.atk : o.ATK),
         pos: normPos(o.position != null ? o.position : o.pos),
-        club: o.club ? String(o.club).trim() || null : null
+        club: o.club ? String(o.club).trim() || null : null,
+        rar: rarKey(o.rarete != null ? o.rarete : (o.rarity != null ? o.rarity : o.tier))
       };
       var u = parseNum(o.valeur_inconnue != null ? o.valeur_inconnue : o.unk);
       if (u != null) { if (hint) { if (rec[hint] == null) rec[hint] = u; } else rec.unk = u; }
@@ -1181,7 +1271,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
     return detected.map(function (d, i) {
       var m = findMatch(players, idx, d.name, d.club, !!d.unreadable);
       return {
-        key: i, name: d.name, pos: d.pos || null, club: d.club || null,
+        key: i, name: d.name, pos: d.pos || null, club: d.club || null, rar: d.rar || null,
         seen: { def: d.def == null ? null : d.def, atk: d.atk == null ? null : d.atk },
         unreadable: !!d.unreadable,
         status: m.status, id: m.status === 'exact' ? m.id : null, candidates: m.candidates
@@ -1242,6 +1332,8 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
       if (best > 0.4) scored.push({ id: id, name: p.name, score: best });
     });
     scored.sort(function (a, b) { return b.score - a.score; });
+    /* un joueur présent en plusieurs raretés compte pour un seul candidat */
+    (function () { var seenK = {}; scored = scored.filter(function (x) { var k = nameKey(x.name); if (seenK[k]) return false; seenK[k] = 1; return true; }); })();
     var b1 = scored[0] || null, b2 = scored[1] || null;
     var margin = b1 ? b1.score - (b2 ? b2.score : 0) : 0;
     return { text: raw, top: scored.slice(0, 8), best: b1, second: b2, margin: margin, sure: !!(b1 && b1.score >= 0.88 && margin >= 0.095), letters: raw.replace(/[^A-Za-z\u00C0-\u024F]/g, '').length };
@@ -1558,6 +1650,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
       for (var j = i + 1; j < ids.length; j++) {
         if (used[ids[j]]) continue;
         var a = keys[i], b = keys[j];
+        if (players[ids[i]].rar && players[ids[j]].rar && players[ids[i]].rar !== players[ids[j]].rar) continue; /* une fiche par rareté */
         var s = a === b ? 1 : sim(a, b);
         if (s >= 0.88 && !(players[ids[i]].club && players[ids[j]].club && !sameClub(players[ids[i]].club, players[ids[j]].club) && a !== b)) g.push(ids[j]);
         else if (a === b) g.push(ids[j]);
@@ -1739,7 +1832,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
     parseSnatchWatch: parseSnatchWatch, pdfItemsToText: pdfItemsToText, prettyClub: prettyClub, parseCSV: parseCSV, parseTable: parseTable, parseText: parseText, parseLine: parseLine, detectHint: detectHint,
     resolveUnknown: resolveUnknown, normalizeAiRows: normalizeAiRows, normPos: normPos,
     roleStat: roleStat, duelOdds: duelOdds, MUTATIONS: MUTATIONS, critChance: critChance, cleanOcrName: cleanOcrName, simFlex: simFlex, SKILLS: SKILLS, skillAdd: skillAdd, skillCrit: skillCrit, rankingFloor: rankingFloor, rankingFloorsByPos: rankingFloorsByPos, matchTeam: matchTeam, matchOcrName: matchOcrName, matchExtraNames: matchExtraNames, calcTeam: calcTeam, contribution: contribution,
-    findDuplicates: findDuplicates, parseMatchWords: parseMatchWords, matchAnalysis: matchAnalysis, mergePlayers: mergePlayers, randomId: randomId, clonePlayer: clonePlayer
+    findDuplicates: findDuplicates, RARITIES: RARITIES, rarKey: rarKey, rarName: rarName, rarFromColor: rarFromColor, chooseSibling: chooseSibling, sibsOf: sibsOf, parseMatchWords: parseMatchWords, matchAnalysis: matchAnalysis, mergePlayers: mergePlayers, randomId: randomId, clonePlayer: clonePlayer
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Core;
@@ -1824,7 +1917,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
   /* ----- Mode serveur (application hors de Claude) : base et lecture d'images passent par le serveur ----- */
   var SERVER = !!window.SNATCH_SERVER;
   /* Mode « local » : tout reste sur l'appareil (base IndexedDB), lecture des images par OCR gratuit sur l'appareil. Aucun serveur, aucune API payante. */
-  var BUILD = '06/10 10:58';
+  var BUILD = '06/10 12:45';
   /* Blocs repliables (Nouveautés, exemple de capture) : le choix est gardé sur l'appareil */
   function uiGet(key, def) {
     try { var o = JSON.parse(localStorage.getItem('snatch.ui') || '{}'); if (o && typeof o[key] === 'boolean') return o[key]; } catch (e) { /* ignore */ }
@@ -1865,6 +1958,8 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
   /* Historique des mises à jour (affiché dans Réglages) : une ligne simple par amélioration, la plus récente en premier.
      À compléter à chaque nouvelle version. */
   var NEWS = [
+    { when: '6 octobre', title: 'Fiche d\'une carte : enregistrée dans la base', text: 'Envoyez la capture de la page « Carte » d\'un joueur (celle qui montre Rareté, Défense, Attaque et Poste) : l\'application lit le nom, la rareté, la DEF, l\'ATK et le poste, puis enregistre le joueur dans la base pour cette rareté s\'il n\'y est pas encore (ou met ses notes à jour). Si un détail est illisible, elle vous le demande avant d\'enregistrer.' },
+    { when: '6 octobre', title: 'Raretés des cartes : une note par rareté', text: 'Un même joueur n\'a pas les mêmes notes en Legendary, GOAT, Star, Pro ou Common. La base garde maintenant une fiche par rareté : les PDF Snatch Watch sont lus avec leurs icônes, la rareté de chaque carte est lue sur son cadre (et se corrige d\'un tap), et seule la note de la bonne rareté est utilisée. Si la base n\'a pas cette rareté, la note d\'une autre rareté n\'est jamais reprise : la note vue sur la carte ou l\'estimation (moins bon joueur du poste de même rareté − 1) la remplace.' },
     { when: '6 octobre', title: 'Note estimée vérifiable et compétence Fortress', text: 'Quand une note est estimée, la fiche du joueur montre sa carte de la capture à côté de la carte du moins bon joueur du même poste utilisé pour l\'estimation. Nouvelle compétence Fortress (+4 DEF, +10 % de critique) : elle compte dans la défense et dans la chance de critique.' },
     { when: '6 octobre', title: 'Mot de passe et résultats simplifiés', text: 'Réglages : un mot de passe optionnel, que vous choisissez et changez vous-même. Adversaire : résultats plus lisibles (total de base, bonus, puis critiques à part). Une note inconnue est remplacée par celle du moins bon joueur connu de son poste (toute la base), moins 1. Les noms ne se chevauchent plus dans Analyse.' },
     { when: '4 octobre', title: 'Bonus de club en haut de page', text: 'Le bonus de club est maintenant tout en haut d\'Adversaire et de Mon équipe. Les champs « Bonus DEF » et « Bonus ATK » inutiles ont été retirés. Les captures sont aussi mieux lues quand le bandeau du bas cache une rangée, quel que soit le fond.' },
@@ -2203,6 +2298,43 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
     return S.sample.json(prompt, { signal: ctl.signal }).then(function (r) { return C.normalizeAiRows(pickArray(r), hint); });
   }
 
+  /* Rareté de chaque joueur d'une page PDF « Snatch Watch » : l'icône à gauche du nom (étoile Legendary, GOAT, Star, Pro, Common).
+     On dessine la page, puis on lit la couleur moyenne de l'icône située à gauche de chaque nom. */
+  function pdfIcons(pg, tc) {
+    var items = tc.items.filter(function (it) { return it.str && it.str.trim() && /[A-Za-z]/.test(it.str); });
+    if (!items.length) return Promise.resolve([]);
+    var cnt = {};
+    items.forEach(function (it) { var k = Math.round(it.transform[4]); cnt[k] = (cnt[k] || 0) + 1; });
+    var nameX = +Object.keys(cnt).sort(function (a, b) { return cnt[b] - cnt[a]; })[0];
+    var vp = pg.getViewport({ scale: 2 }), cv = document.createElement('canvas');
+    cv.width = Math.ceil(vp.width); cv.height = Math.ceil(vp.height);
+    var cx = cv.getContext('2d', { willReadFrequently: true });
+    cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height);
+    return pg.render({ canvasContext: cx, viewport: vp }).promise.then(function () {
+      var out = [];
+      items.forEach(function (it) {
+        var x = it.transform[4], y = it.transform[5];
+        if (Math.abs(x - nameX) > 1.6) return;
+        var a = vp.convertToViewportPoint(x - 29, y - 9), b = vp.convertToViewportPoint(x - 12, y + 8);
+        var xa = Math.max(0, Math.floor(Math.min(a[0], b[0]))), xb = Math.min(cv.width, Math.ceil(Math.max(a[0], b[0])));
+        var ya = Math.max(0, Math.floor(Math.min(a[1], b[1]))), yb = Math.min(cv.height, Math.ceil(Math.max(a[1], b[1])));
+        if (xb - xa < 4 || yb - ya < 4) return;
+        var d = cx.getImageData(xa, ya, xb - xa, yb - ya).data, sx = 0, sy = 0, sat = 0, val = 0, n = 0;
+        for (var i = 0; i < d.length; i += 4) {
+          var r = d[i] / 255, g = d[i + 1] / 255, bl = d[i + 2] / 255, mx = Math.max(r, g, bl), mn = Math.min(r, g, bl), df = mx - mn;
+          if (mx <= 0 || df / mx < 0.12) continue;
+          var h = mx === r ? ((g - bl) / df) % 6 : (mx === g ? (bl - r) / df + 2 : (r - g) / df + 4);
+          h = (h / 6) * 2 * Math.PI;
+          sx += Math.cos(h); sy += Math.sin(h); sat += df / mx; val += mx; n++;
+        }
+        var res = null;
+        if (n >= 25) res = C.rarFromColor(((Math.atan2(sy, sx) * 180 / Math.PI) % 360 + 360) % 360, sat / n, val / n);
+        out.push({ str: it.str.trim(), rar: res ? res.key : null, sure: res ? res.sure : false });
+      });
+      return out;
+    });
+  }
+
   function readPdf(file, job, mode, hint) {
     var base = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
     return (window.pdfjsLib ? Promise.resolve() : loadScript(base + 'pdf.min.js')).then(function () {
@@ -2213,17 +2345,31 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
     }).then(function (buf) {
       return window.pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
     }).then(function (pdf) {
-      var texts = [], seq = Promise.resolve();
+      var texts = [], seq = Promise.resolve(), icons = [];
       for (var n = 1; n <= pdf.numPages; n++) {
         (function (pn) {
-          seq = seq.then(function () { return pdf.getPage(pn); }).then(function (pg) { return pg.getTextContent(); })
-            .then(function (tc) { texts.push(C.pdfItemsToText(tc.items)); });
+          seq = seq.then(function () { return pdf.getPage(pn); }).then(function (pg) {
+            return pg.getTextContent().then(function (tc) {
+              texts.push(C.pdfItemsToText(tc.items));
+              return pdfIcons(pg, tc).then(function (l) { icons = icons.concat(l); }).catch(function () { /* icônes illisibles : la rareté se choisira à la main */ });
+            });
+          });
         })(n);
       }
       return seq.then(function () {
         var text = texts.join('\n');
         var parsed = C.parseText(text, hint);
         if (parsed.rows.length >= 3) {
+          var byName = {};
+          icons.forEach(function (ic) { (byName[ic.str] = byName[ic.str] || []).push(ic); });
+          var rc = {}, unsureR = 0;
+          parsed.rows.forEach(function (r) {
+            var q = byName[r.name];
+            if (q && q.length) { var ic = q.shift(); if (ic.rar) { r.rar = ic.rar; rc[ic.rar] = (rc[ic.rar] || 0) + 1; if (!ic.sure) unsureR++; } }
+          });
+          var nr = Object.keys(rc).reduce(function (a, k) { return a + rc[k]; }, 0);
+          if (nr) job.notes.push('Rareté lue sur les icônes : ' + C.RARITIES.filter(function (r) { return rc[r.key]; }).map(function (r) { return rc[r.key] + ' ' + r.name; }).join(', ') + (nr < parsed.rows.length ? ' (' + (parsed.rows.length - nr) + ' non lues)' : '') + '.');
+          if (unsureR) job.warnings.push('La rareté Star, Pro ou Common de ' + plural(unsureR, 'joueur', 'joueurs') + ' est moins sûre à lire : vérifiez-la dans la liste ou choisissez la rareté du fichier.');
           parsed.notes.forEach(function (n) { job.notes.push(n); });
           (parsed.warnings || []).forEach(function (w) { job.warnings.push(w); });
           job.notes.push('Texte du PDF lu directement (' + pdf.numPages + ' page' + (pdf.numPages > 1 ? 's' : '') + ').');
@@ -2318,6 +2464,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
       renderTab();
       readJob(job, file).then(function (rows) {
         job.rows = rows || [];
+        if (!job.rows.some(function (r) { return r.rar; })) { var fk = C.rarKey(String(file.name || '').replace(/\.[^.]+$/, '').replace(/[_\-.]+/g, ' ')); if (fk) job.rar = fk; }
         if (!job.rows.length) { job.status = 'error'; job.err = 'Aucun joueur lisible dans ce fichier.'; }
         else job.status = 'ready';
       }).catch(function (e) {
@@ -2327,8 +2474,13 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
     });
   }
 
+  /* rareté d'un fichier : lue dans le fichier (icônes, colonne), ou imposée par l'utilisateur pour tout le fichier */
+  function jobRows(job) {
+    if (!job.rar) return job.rows;
+    return job.rows.map(function (r) { var q = {}; Object.keys(r).forEach(function (k) { q[k] = r[k]; }); q.rar = job.rar; return q; });
+  }
   function jobReport(job) {
-    return C.applyImport(S.db.players, job.rows, job.decisions, job.keepOld, { file: job.name, chunks: CHUNKS });
+    return C.applyImport(S.db.players, jobRows(job), job.decisions, job.keepOld, { file: job.name, chunks: CHUNKS });
   }
 
   function saveJob(job) {
@@ -2458,6 +2610,29 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
     if (y1 - y0 < 40) return null;
     var f = fondFeatures(fondThumb(cv, { x: card.x0, y: y0, w: w, h: y1 - y0 }));
     return fondPredict(f);
+  }
+
+  /* Rareté lue sur le cadre de la carte : bandes verticales étroites le long des bords gauche et droit (couleur moyenne des pixels colorés) */
+  function readCardRar(cv, card) {
+    var w = card.x1 - card.x0, ya = Math.max(0, Math.round(card.top - 1.0 * w)), yb = Math.round(card.top - 0.35 * w);
+    if (yb - ya < 20 || w < 40) return null;
+    var cx = cv.getContext('2d'), sx = 0, sy = 0, n = 0, sat = 0, val = 0;
+    [[0.012, 0.045], [0.955, 0.988]].forEach(function (b) {
+      var xa = Math.round(card.x0 + b[0] * w), xb = Math.round(card.x0 + b[1] * w);
+      if (xb <= xa) xb = xa + 1;
+      var d = cx.getImageData(xa, ya, xb - xa, yb - ya).data;
+      for (var i = 0; i < d.length; i += 4) {
+        var r = d[i] / 255, g = d[i + 1] / 255, bl = d[i + 2] / 255, mx = Math.max(r, g, bl), mn = Math.min(r, g, bl), df = mx - mn;
+        if (mx <= 0 || df / mx < 0.12) continue;
+        var h = 0;
+        if (mx === r) h = ((g - bl) / df) % 6; else if (mx === g) h = (bl - r) / df + 2; else h = (r - g) / df + 4;
+        h = (h / 6) * 2 * Math.PI;
+        sx += Math.cos(h); sy += Math.sin(h); sat += df / mx; val += mx; n++;
+      }
+    });
+    if (n < 30) return null;
+    var hue = ((Math.atan2(sy, sx) * 180 / Math.PI) % 360 + 360) % 360;
+    return C.rarFromColor(hue, sat / n, val / n);
   }
 
   function ocrText(cv) {
@@ -2957,7 +3132,140 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
     return cv;
   }
 
+  /* ---------- Fiche d'une carte (page « Carte » du jeu) : notes DEF/ATK, rareté, poste lus sur la capture et enregistrés dans la base ---------- */
+  function sheetParse(text) {
+    var raw = String(text || '').split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+    var low = raw.map(function (l) { return C.normText(l); });
+    var all = low.join('\n');
+    var rx = { rar: /raret|rarity/, def: /\bdefense\b|\bdefence\b/, atk: /\battaque\b|\battack\b/, mut: /mutation/, inc: /income/, pos: /position/, crit: /crit/ };
+    var hits = Object.keys(rx).filter(function (k) { return rx[k].test(all); }).length;
+    var out = { isSheet: hits >= 3 && rx.rar.test(all) && (rx.def.test(all) || rx.atk.test(all)), rar: null, def: null, atk: null, pos: null };
+    if (!out.isSheet) return out;
+    var i;
+    for (i = 0; i < low.length && !out.rar; i++) {
+      if (rx.rar.test(low[i])) out.rar = C.rarKey(low[i].replace(/^.*(raret\w*|rarity)/, '')) || C.rarKey(low[i + 1] || '');
+    }
+    var li = -1;
+    for (i = 0; i < low.length; i++) { if (rx.def.test(low[i]) || rx.atk.test(low[i])) { li = i; break; } }
+    if (li >= 0) {
+      var defFirst = true, dm = low[li].search(rx.def), am = low[li].search(rx.atk);
+      if (dm >= 0 && am >= 0) defFirst = dm < am; else if (am >= 0 && dm < 0) defFirst = false;
+      var toks = [];
+      for (i = li + 1; i < Math.min(low.length, li + 4); i++) {
+        if (/income|m\/s|crit|position/.test(low[i])) continue;
+        (raw[i].match(/(^|[^\d.,])\d{1,3}(?![\d.,])/g) || []).forEach(function (x) {
+          var dg = x.replace(/\D/g, '');
+          /* l'icône bouclier/étoile collée au chiffre (« 389 » pour 89) : un nombre à 3 chiffres qui ne commence pas par 1 perd son premier chiffre */
+          if (dg.length === 3 && !(dg.charAt(0) === '1' && parseInt(dg, 10) <= 130)) dg = dg.slice(1);
+          toks.push(parseInt(dg, 10));
+        });
+        if (toks.length >= 2) break;
+      }
+      toks = toks.filter(function (v) { return v >= 10 && v <= 150; });
+      if (toks.length >= 2) { var a = toks[toks.length - 2], b = toks[toks.length - 1]; out.def = defFirst ? a : b; out.atk = defFirst ? b : a; }
+    }
+    if (/\bdefenseur\b|\bdefender\b/.test(all)) out.pos = 'DEF';
+    else if (/attaquant|forward|striker/.test(all)) out.pos = 'FWD';
+    else if (/milieu|midfielder/.test(all)) out.pos = 'MID';
+    else if (/gardien|goalkeeper/.test(all)) out.pos = 'GK';
+    return out;
+  }
+  function sheetCrop(cv) {
+    var W = cv.width, H = cv.height, y0 = Math.round(H * 0.52), k = Math.min(1, 1100 / W);
+    var c = document.createElement('canvas'); c.width = Math.round(W * k); c.height = Math.round((H - y0) * k);
+    var cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height); cx.imageSmoothingQuality = 'high';
+    cx.drawImage(cv, 0, y0, W, H - y0, 0, 0, c.width, c.height);
+    return c;
+  }
+  /* nom écrit sur la carte : même lecture que pour les cartes d'une équipe, avec la carte placée par rapport à la largeur de l'écran */
+  function readSheetName(cv) {
+    var W = cv.width, best = null, chain = Promise.resolve();
+    [1.181, 1.15, 1.21].forEach(function (tp) {
+      chain = chain.then(function () {
+        if (best && best.sure) return null;
+        var card = { x0: 0.187 * W, x1: 0.8125 * W, top: tp * W }, variants = [], m = null, c2 = Promise.resolve();
+        ['dark', 'blob80', 'otsu', 'blob55', 'gray', 'dark70', 'blob110'].forEach(function (mode) {
+          c2 = c2.then(function () {
+            if (m && m.sure && m.best.score >= 0.95) return null;
+            var c = nameCanvas(cv, card, mode); if (!c) return null;
+            return ocrText(c).then(function (t) { variants.push(t); m = C.matchOcrName(S.db.players, variants); });
+          });
+        });
+        return c2.then(function () {
+          if (!m) return null;
+          var cand = null, xm = null;
+          if (m.sure) cand = { name: m.best.name, sure: true, score: m.best.score };
+          else {
+            if (m.letters >= 4) { try { xm = C.matchExtraNames(EXTRA_NAMES, variants); } catch (e) { xm = null; } }
+            if (xm && xm.best && ((xm.best.score >= 0.9 && xm.margin >= 0.095) || (xm.best.score >= 0.84 && xm.margin >= 0.2))) cand = { name: xm.best.name, sure: true, score: xm.best.score };
+            else if (m.best && m.best.score >= 0.65 && m.margin >= 0.12) cand = { name: m.best.name, sure: false, score: m.best.score };
+            else if (m.letters >= 4) cand = { name: C.cleanOcrName(m.text) || m.text, sure: false, score: 0 };
+          }
+          if (cand && (!best || (cand.sure && !best.sure) || (cand.sure === best.sure && cand.score > best.score))) best = cand;
+        });
+      });
+    });
+    return chain.then(function () { return best || { name: '', sure: false }; });
+  }
+  function sheetSave(sh) {
+    var row = { name: sh.name, def: sh.def, atk: sh.atk, pos: sh.pos || null, rar: sh.rar || null };
+    var rep = C.applyImport(S.db.players, [row], {}, {}, { file: 'fiche de carte (capture)', chunks: CHUNKS });
+    var it = rep.items[0];
+    if (it.result === 'toconfirm') { var top = it.candidates[0]; rep = C.applyImport(S.db.players, [row], { 0: top && top.score >= 0.95 ? top.id : 'new' }, {}, { file: 'fiche de carte (capture)', chunks: CHUNKS }); it = rep.items[0]; }
+    if (!it.id) return false;
+    var chunks = {};
+    Object.keys(rep.players).forEach(function (id) { S.db.players[id] = rep.players[id]; chunks[chunkOf(id)] = 1; });
+    S.db.imports.unshift({ id: uid(), date: new Date().toISOString(), name: 'Fiche de carte (capture)', kind: 'Capture', rows: 1, created: rep.created, completed: rep.completed, updated: rep.updated, unchanged: rep.unchanged, skipped: 0, hint: null });
+    persist({ chunks: chunks, imports: true });
+    sh.saved = { id: it.id, result: it.result, changes: it.changes || [] };
+    return true;
+  }
+  function renderSheet() {
+    if (S.sheetBusy) return '<section class="card busy"><div class="spin" aria-hidden="true"></div><div><b>Lecture de la capture…</b><p class="muted">' + esc(S.sheetBusy) + '</p></div></section>';
+    var sh = S.sheet;
+    if (!sh) return '';
+    var h = '<section class="card sheetcard"><header class="jh"><div><b>Fiche de carte lue</b><small>Notes vues sur la carte, pas dans un fichier</small></div><button class="x" data-act="sheet-close" aria-label="Fermer">×</button></header>';
+    if (sh.saved) {
+      var p = S.db.players[sh.saved.id], what = { created: 'ajouté à la base (nouvelle fiche de cette rareté)', completed: 'fiche complétée', updated: 'notes mises à jour', unchanged: 'déjà dans la base avec ces notes' }[sh.saved.result] || 'enregistré';
+      h += '<p class="note ok"><b>' + esc(p ? p.name : sh.name) + '</b>' + rarBadge(p && p.rar) + ' · ' + STATS.map(function (s) { return STAT_LABEL[s] + ' <b>' + fmt(p ? p[s] : sh[s]) + '</b>'; }).join(' · ') + (p && p.pos ? ' · ' + esc(p.pos) : '') + ' — ' + what + '.</p>';
+      (sh.saved.changes || []).filter(function (c) { return c.kind === 'changed'; }).forEach(function (c) { h += '<p class="muted small">' + STAT_LABEL[c.stat] + ' : ' + fmt(c.old) + ' → ' + fmt(c.now) + '</p>'; });
+      h += '<div class="row gap"><button class="btn small" data-act="edit-player" data-id="' + esc(sh.saved.id) + '">Modifier la fiche</button><button class="btn small ghost" data-act="sheet-close">Fermer</button></div></section>';
+      return h;
+    }
+    h += '<p class="note warn small">' + esc(sh.why || 'Vérifiez ce qui a été lu, puis enregistrez.') + '</p>';
+    h += '<label class="field"><span>Nom du joueur</span><input id="sh-name" type="text" value="' + esc(sh.name || '') + '" autocomplete="off"></label>';
+    h += '<div class="lbl">Rareté de la carte</div><div class="mactions rarrow">' + C.RARITIES.map(function (r) { return '<button class="btn small' + (sh.rar === r.key ? '' : ' ghost') + '" data-act="sheet-rar" data-rar="' + r.key + '"><i class="rdot r-' + r.key + '"></i>' + r.name + '</button>'; }).join('') + '</div>';
+    h += '<div class="grid2"><label class="field"><span>DEF</span><input id="sh-def" type="text" inputmode="decimal" value="' + (sh.def == null ? '' : esc(sh.def)) + '"></label><label class="field"><span>ATK</span><input id="sh-atk" type="text" inputmode="decimal" value="' + (sh.atk == null ? '' : esc(sh.atk)) + '"></label></div>';
+    h += '<label class="field"><span>Poste</span><select id="sh-pos"><option value="">Inconnu</option>' + [['GK', 'Gardien'], ['DEF', 'Défenseur'], ['MID', 'Milieu'], ['FWD', 'Attaquant']].map(function (o) { return '<option value="' + o[0] + '"' + (sh.pos === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>';
+    h += '<div class="row gap"><button class="btn primary" data-act="sheet-save">Enregistrer dans la base</button><button class="btn ghost" data-act="sheet-close">Annuler</button></div></section>';
+    return h;
+  }
+  function sheetCheck(file) {
+    S.sheetBusy = 'Recherche des notes de la carte…'; renderTab();
+    return bitmapCanvas(file, 3200).then(function (cv) {
+      return ocrText(sheetCrop(cv)).then(function (t) {
+        var p = sheetParse(t);
+        if (!p.isSheet) return null;
+        S.sheetBusy = 'Lecture du nom de la carte…'; renderTab();
+        return readSheetName(cv).then(function (nm) { p.name = nm.name; p.nameSure = nm.sure; return p; });
+      });
+    }).catch(function () { return null; }).then(function (p) {
+      S.sheetBusy = null;
+      if (!p) { renderTab(); return false; }
+      var miss = [];
+      if (!p.name) miss.push('le nom'); else if (!p.nameSure) miss.push('le nom (à vérifier)');
+      if (!p.rar) miss.push('la rareté'); if (p.def == null) miss.push('la défense'); if (p.atk == null) miss.push('l\'attaque'); if (!p.pos) miss.push('le poste');
+      S.sheet = { name: p.name, rar: p.rar, def: p.def, atk: p.atk, pos: p.pos, why: miss.length ? 'À compléter ou vérifier : ' + miss.join(', ') + '.' : '', saved: null };
+      if (!miss.length) sheetSave(S.sheet);
+      renderTab();
+      return true;
+    });
+  }
+
   function analyseScreenshotLocal(file, mine) {
+    return sheetCheck(file).then(function (handled) { if (!handled) return analyseTeamLocal(file, mine); });
+  }
+  function analyseTeamLocal(file, mine) {
     var ctl = { cancelled: false }, notes = [];
     var prev = mine ? (OPP ? S.team : S.mine.team) : S.team;
     if (prev && prev.img && prev.img.url) { try { URL.revokeObjectURL(prev.img.url); } catch (e) { /* ignore */ } }
@@ -2976,7 +3284,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
       var bgp = bgPalette(cv, found); cells = cells.filter(function (c) { return !(c.guessed && bgp && cellLooksEmpty(cv, c, bgp)); }); grid.guessed = cells.filter(function (c) { return c.guessed; }).length;
       cells.sort(function (a, b) { return a.row - b.row || a.x0 - b.x0; });
       T.progress = 'Chargement du moteur de lecture (première fois seulement)…'; renderTab();
-      var rows = [], srcs = [], sks = [], fds = [], crops = [], skipped = 0, seq = Promise.resolve();
+      var rows = [], srcs = [], sks = [], fds = [], rrs = [], crops = [], skipped = 0, seq = Promise.resolve();
       cells.forEach(function (card, i) {
         seq = seq.then(function () {
           stop();
@@ -3026,19 +3334,20 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
             // poste : celui de la base s'il est connu, sinon l'étiquette lue sur la carte
             var dbp = m.sure ? S.db.players[m.best.id] : null;
             var fd = null; try { fd = readCardFond(cv, card); } catch (e) { fd = null; }
+            var rr0 = null; try { rr0 = readCardRar(cv, card); } catch (e) { rr0 = null; }
             var crop = cardCrop(cv, card);
             return readCardSkills(cv, card).catch(function () { return []; }).then(function (sk) {
-              if (dbp && dbp.pos) { rows.push(row); srcs.push(null); sks.push(sk); fds.push(fd); crops.push(crop); return null; }
+              if (dbp && dbp.pos) { rows.push(row); srcs.push(null); sks.push(sk); fds.push(fd); rrs.push(rr0); crops.push(crop); return null; }
               return readCardTag(cv, card).catch(function () { return null; }).then(function (tag) {
                 if (tag) row.position = tag;
-                rows.push(row); srcs.push(tag ? 'carte' : null); sks.push(sk); fds.push(fd); crops.push(crop);
+                rows.push(row); srcs.push(tag ? 'carte' : null); sks.push(sk); fds.push(fd); rrs.push(rr0); crops.push(crop);
               });
             });
           });
         });
       });
       return seq.then(function () {
-        T.srcs = srcs; T.sks = sks; T.fds = fds; T.crops = crops; T.nCells = cells.length;
+        T.srcs = srcs; T.sks = sks; T.fds = fds; T.rrs = rrs; T.crops = crops; T.nCells = cells.length;
         try { var topY = Math.min.apply(null, cells.map(function (c) { return c.top - 1.42 * (c.x1 - c.x0); })); T.focus = Math.max(0, Math.min(0.9, (topY - 0.03 * cv.height) / cv.height)); } catch (e) { T.focus = 0; }
         if (grid.guessed) notes.push('La dernière ligne est partiellement cachée par le bandeau du bas : vérifiez qu\'il ne manque aucun joueur (bouton « Ajouter un joueur »).');
         return rows;
@@ -3056,6 +3365,13 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
       });
       if (fondRead) notes.push('Le fond de chaque carte (chance de critique) est lu automatiquement sur ' + plural(fondRead, 'carte', 'cartes') + ' sur ' + T.members.length + ' : vérifiez-le, vous pouvez le corriger sur chaque carte.' + (fondUnsure.length ? ' Lecture incertaine : ' + fondUnsure.join(', ') + '.' : ''));
       if (fondRead < T.members.length) notes.push('Fond non lu sur ' + plural(T.members.length - fondRead, 'carte', 'cartes') + ' : choisissez-le à la main sur la carte.');
+      var rarRead = 0, rarUnsure = [];
+      T.members.forEach(function (m, i) {
+        var rr = T.rrs && T.rrs[i];
+        if (rr && rr.key) { m.rar = rr.key; m.rarAuto = true; rarRead++; if (!rr.sure) rarUnsure.push(m.name); }
+      });
+      if (rarRead) notes.push('La rareté de chaque carte est lue sur son cadre (' + plural(rarRead, 'carte', 'cartes') + ' sur ' + T.members.length + ') : elle décide quelle note de la base est utilisée. Vérifiez-la, vous pouvez la corriger sur chaque carte.' + (rarUnsure.length ? ' Lecture incertaine (Star, Pro ou Common) : ' + rarUnsure.join(', ') + '.' : ''));
+      if (rarRead < T.members.length) notes.push('Rareté non lue sur ' + plural(T.members.length - rarRead, 'carte', 'cartes') + ' : choisissez-la à la main sur la carte.');
       var skUnsure = 0;
       T.members.forEach(function (m, i) {
         var sk = (T.sks && T.sks[i]) || [];
@@ -3124,10 +3440,11 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
   var POS_FR = { GK: 'Gardiens', DEF: 'Défenseurs', MID: 'Milieux', FWD: 'Attaquants' };
   /* Règle « moins bon − 1 » : uniquement si la statistique est inconnue. On prend le moins bon joueur CONNU du même poste dans toute la base
      (tous les fichiers importés), pour la statistique qui manque, puis on retire 1. Le 50e du classement n'est plus utilisé. */
-  function worstByPos() {
+  function worstByPos(rar) {
     var out = {};
     Object.keys(S.db.players).forEach(function (id) {
       var p = S.db.players[id], pos = C.normPos(p.pos);
+      if (rar && p.rar && p.rar !== rar) return; /* on compare des cartes de même rareté (les fiches sans rareté comptent aussi) */
       if (pos !== 'GK' && pos !== 'DEF' && pos !== 'MID' && pos !== 'FWD') return;
       STATS.forEach(function (s) {
         if (p[s] == null) return;
@@ -3140,11 +3457,21 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
   function floorFor(m, p, s) {
     var pos = C.normPos((p && p.pos) || m.pos);
     if (pos !== 'GK' && pos !== 'DEF' && pos !== 'MID' && pos !== 'FWD') return null;
-    var w = worstByPos(), hit = w[pos] && w[pos][s];
-    return hit ? { value: hit.value, pos: pos, n: hit.n, who: hit.name, id: hit.id } : null;
+    var w = worstByPos(m.rar || null), hit = w[pos] && w[pos][s];
+    return hit ? { value: hit.value, pos: pos, n: hit.n, who: hit.name, id: hit.id, rar: m.rar || null } : null;
+  }
+  /* Fiche du joueur selon la rareté de la carte : une fiche par rareté (Legendary, GOAT, Star, Pro, Common).
+     p0 = identité (nom, poste, club) ; p = fiche dont on prend les notes (null si la base n'a pas cette rareté) ; others = fiches d'autres raretés */
+  function memberRec(m) {
+    var p0 = m.id ? S.db.players[m.id] : null;
+    if (!p0) return { p0: null, p: null, how: 'none', others: [] };
+    if (!m.rar) return { p0: p0, p: p0, how: 'any', others: [] };
+    var ids = C.sibsOf(S.db.players, m.id), cs = C.chooseSibling(S.db.players, ids, m.rar);
+    if (cs.how === 'other') return { p0: p0, p: null, how: 'other', others: ids.map(function (i) { return S.db.players[i]; }) };
+    return { p0: p0, p: S.db.players[cs.id], how: cs.how, others: [] };
   }
   function effStats(m) {
-    var p = m.id ? S.db.players[m.id] : null;
+    var mr = memberRec(m), p = mr.p, p0 = mr.p0;
     var out = { src: {} };
     STATS.forEach(function (s) {
       var dbv = p && p[s] != null ? p[s] : null, seen = m.seen && m.seen[s] != null ? m.seen[s] : null;
@@ -3152,8 +3479,8 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
       if (m.useSeen && m.useSeen[s] && seen != null) { v = seen; src = 'capture'; }
       else if (dbv != null) { v = dbv; src = 'base'; }
       else if (seen != null) { v = seen; src = 'capture'; }
-      if (v == null) { var fp = floorFor(m, p, s); if (fp) { v = fp.value - 1; src = 'estimé'; out.estInfo = out.estInfo || {}; out.estInfo[s] = fp; } }
-      out[s] = v; out.src[s] = src;
+      if (v == null) { var fp = floorFor(m, p0, s); if (fp) { v = fp.value - 1; src = 'estimé'; out.estInfo = out.estInfo || {}; out.estInfo[s] = fp; } }
+      out[s] = v; out.src[s] = src; out.rec = mr;
       if (dbv != null && seen != null && dbv !== seen) { out.src[s + 'Diff'] = { db: dbv, seen: seen }; }
     });
     return out;
@@ -3516,6 +3843,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
     h += '<label class="btn primary big" for="shot-input">' + ICONS.analyse + '<span>Envoyer une capture d\'écran</span></label>';
     h += '<input id="shot-input" type="file" accept="image/*" hidden>';
     h += '</section>';
+    h += renderSheet();
     h += renderBonusPanel();
     h += howtoCard('opp');
 
@@ -3581,12 +3909,21 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
     h += '</div>' + st + '</div>';
     if (m.unreadable) h += '<p class="note warn small">Nom difficile à lire sur la capture. Vérifiez-le.</p>';
     h += '<div class="chips">' + STATS.map(function (s) { return chip(s, e[s], e.src[s]); }).join('') + '</div>';
+    var mr = e.rec;
+    if (m.rar && mr && mr.how === 'other') {
+      h += '<p class="note warn small"><b>' + esc(C.rarName(m.rar)) + '</b> : la base n\'a pas de note de cette rareté pour ' + esc(p ? p.name : m.name) + ' (elle a ' + mr.others.map(function (o) { return esc(C.rarName(o.rar) || 'rareté inconnue') + ' ' + (o.def != null ? fmt(o.def) : '?') + '/' + (o.atk != null ? fmt(o.atk) : '?'); }).join(', ') + ' en DEF/ATK). Ces notes d\'une autre rareté ne sont <b>pas</b> utilisées : importez la liste ' + esc(C.rarName(m.rar)) + ' ou saisissez les notes vues sur la carte.</p>';
+    } else if (m.rar && mr && mr.how === 'legacy') {
+      h += '<p class="note small">Note de la base sans rareté enregistrée : vérifiez qu\'elle correspond bien à ' + esc(C.rarName(m.rar)) + ' (réimportez la liste avec les étoiles pour l\'étiqueter).</p>';
+    }
+    h += '<div class="lbl">Rareté de la carte' + (m.rarAuto ? ' (lue sur le cadre, à vérifier)' : '') + '</div><div class="mactions rarrow">' + C.RARITIES.map(function (r) {
+      return '<button class="btn small' + (m.rar === r.key ? '' : ' ghost') + '" data-act="rar" data-key="' + m.key + '" data-rar="' + r.key + '"><i class="rdot r-' + r.key + '"></i>' + r.name + '</button>';
+    }).join('') + '</div>';
     STATS.forEach(function (s) {
       var fp = e.estInfo && e.estInfo[s]; if (!fp) return;
       var wp = fp.id ? S.db.players[fp.id] : null;
       h += '<div class="estbox"><div class="estimgs">' + (m.crop ? '<figure><img src="' + esc(m.crop) + '" alt="Carte sur la capture"><figcaption>Sur la capture</figcaption></figure>' : '') +
-        '<figure>' + (wp && wp.img ? '<img src="' + esc(wp.img) + '" alt="Carte du moins bon joueur">' : '<div class="estnoimg">pas de carte enregistrée</div>') + '<figcaption>Moins bon ' + esc(POS_FR_S[fp.pos] || '') + '</figcaption></figure></div>' +
-        '<p class="small"><b>' + STAT_LABEL[s] + ' inconnue → ' + fmt(fp.value - 1) + '</b> : le moins bon ' + esc(POS_FR_S[fp.pos] || '') + ' connu en ' + STAT_LABEL[s] + ' est <b>' + esc(fp.who || '') + '</b> (' + fmt(fp.value) + ', parmi ' + plural(fp.n, 'joueur', 'joueurs') + '), moins 1.</p></div>';
+        '<figure>' + (wp && wp.img ? '<img src="' + esc(wp.img) + '" alt="Carte du moins bon joueur">' : '<div class="estnoimg">pas de carte enregistrée</div>') + '<figcaption>Moins bon ' + esc(POS_FR_S[fp.pos] || '') + (fp.rar ? ' ' + esc(C.rarName(fp.rar)) : '') + '</figcaption></figure></div>' +
+        '<p class="small"><b>' + STAT_LABEL[s] + ' inconnue → ' + fmt(fp.value - 1) + '</b> : le moins bon ' + esc(POS_FR_S[fp.pos] || '') + (fp.rar ? ' ' + esc(C.rarName(fp.rar)) : '') + ' connu en ' + STAT_LABEL[s] + ' est <b>' + esc(fp.who || '') + '</b> (' + fmt(fp.value) + ', parmi ' + plural(fp.n, 'joueur', 'joueurs') + '), moins 1.</p></div>';
     });
     STATS.forEach(function (s) {
       var d = e.src[s + 'Diff'];
@@ -3752,14 +4089,14 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
   }
   function mineSnapshot() {
     return {
-      members: S.mine.team.members.map(function (m) { return { key: m.key, id: m.id || null, name: m.name, pos: m.pos || null, club: m.club || null, skills: m.skills || {}, fond: m.fond || null, crop: m.crop || null }; }),
+      members: S.mine.team.members.map(function (m) { return { key: m.key, id: m.id || null, name: m.name, pos: m.pos || null, club: m.club || null, skills: m.skills || {}, fond: m.fond || null, rar: m.rar || null, crop: m.crop || null }; }),
       bonus: S.mine.bonus, mainsOff: S.mine.mainsOff
     };
   }
   function applyMine(d) {
     if (!d || !Array.isArray(d.members)) return;
     S.mine.team = { state: 'done', err: '', img: null, ctl: null, members: d.members.map(function (m, i) {
-      return { key: m.key != null ? m.key : i, id: m.id && S.db.players[m.id] ? m.id : null, name: m.name, pos: m.pos, club: m.club, skills: m.skills || {}, fond: m.fond || null, crop: m.crop || null, seen: { def: null, atk: null }, unreadable: false, status: 'manual', candidates: [] };
+      return { key: m.key != null ? m.key : i, id: m.id && S.db.players[m.id] ? m.id : null, name: m.name, pos: m.pos, club: m.club, skills: m.skills || {}, fond: m.fond || null, rar: m.rar || null, crop: m.crop || null, seen: { def: null, atk: null }, unreadable: false, status: 'manual', candidates: [] };
     }) };
     S.mine.bonus = Object.assign({ def: '', atk: '', clubDef: '', clubAtk: '', critDef: '', critAtk: '' }, d.bonus || {});
     S.mine.mainsOff = d.mainsOff || {};
@@ -3868,7 +4205,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
       var t = S.team, x = '';
       x += '<p class="muted small">Envoyez une capture de votre équipe, ou ajoutez vos joueurs depuis votre base. Votre équipe est gardée en mémoire sur cet appareil et incluse dans la sauvegarde.</p>';
       if (LOCAL) {
-        x += '<label class="btn primary big" for="mine-shot-input">' + ICONS.analyse + '<span>Envoyer la capture de mon équipe</span></label><input id="mine-shot-input" type="file" accept="image/*" hidden>';
+        x += '<label class="btn primary big" for="mine-shot-input">' + ICONS.analyse + '<span>Envoyer la capture de mon équipe</span></label><input id="mine-shot-input" type="file" accept="image/*" hidden>' + renderSheet();
         if (t.state === 'reading') x += '<section class="card busy"><div class="spin" aria-hidden="true"></div><div><b>Lecture de la capture…</b><p class="muted">' + esc(t.progress || 'Cela prend en général 10 à 60 secondes.') + '</p></div><button class="btn ghost" data-act="stop-shot">Arrêter</button></section>';
         (t.notes || []).forEach(function (n) { x += '<p class="note warn">' + esc(n) + '</p>'; });
         if (t.err) x += '<section class="card alert bad"><p>' + esc(t.err) + '</p></section>';
@@ -4120,6 +4457,11 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
       (rep.unchanged ? '<span class="chip"><b>' + rep.unchanged + '</b> déjà à jour</span>' : '') +
       (rep.toconfirm ? '<span class="chip warnc"><b>' + rep.toconfirm + '</b> à confirmer</span>' : '') +
       (rep.skipped ? '<span class="chip"><b>' + rep.skipped + '</b> ignorés</span>' : '') + '</div>';
+    var rarCount = {}, rarNone = 0;
+    jobRows(job).forEach(function (r) { if (r.rar) rarCount[r.rar] = (rarCount[r.rar] || 0) + 1; else rarNone++; });
+    h += '<div class="rarjob"><div class="lbl">Rareté des joueurs de ce fichier</div><div class="mactions rarrow"><button class="btn small' + (job.rar ? ' ghost' : '') + '" data-act="job-rar" data-job="' + job.id + '" data-rar="">Lue dans le fichier</button>' +
+      C.RARITIES.map(function (r) { return '<button class="btn small' + (job.rar === r.key ? '' : ' ghost') + '" data-act="job-rar" data-job="' + job.id + '" data-rar="' + r.key + '"><i class="rdot r-' + r.key + '"></i>' + r.name + '</button>'; }).join('') + '</div>' +
+      '<p class="muted small">' + (Object.keys(rarCount).length ? 'Lu : ' + C.RARITIES.filter(function (r) { return rarCount[r.key]; }).map(function (r) { return rarCount[r.key] + ' ' + r.name; }).join(', ') + (rarNone ? ' · ' + rarNone + ' sans rareté' : '') + '.' : 'Aucune rareté lue dans ce fichier : choisissez-la ci-dessus, sinon les notes seront enregistrées sans rareté (comme avant).') + (Object.keys(rarCount).some(function (k) { return k !== 'legendary' && k !== 'goat'; }) ? ' Star, Pro et Common se ressemblent : vérifiez la liste.' : '') + '</p></div>';
     var nStatRows = { def: 0, atk: 0 };
     job.rows.forEach(function (r) { STATS.forEach(function (s) { if (r[s] != null) nStatRows[s]++; }); });
     h += '<p class="muted small">' + job.rows.length + ' lignes lues · DEF : ' + nStatRows.def + ' · ATK : ' + nStatRows.atk + '. Les statistiques absentes du fichier restent vides.</p>';
@@ -4149,12 +4491,16 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
     }
     h += '<details class="more"><summary>Voir les ' + job.rows.length + ' lignes lues</summary><ul class="rows">' + rep.items.map(function (it) {
       var lbl = { created: 'nouveau', completed: 'complété', updated: 'modifié', unchanged: 'à jour', skipped: 'ignoré', toconfirm: 'à confirmer' }[it.result] || '';
-      return '<li><span>' + esc(it.row.name) + '</span><span class="chips tiny">' + STATS.map(function (s) { return it.row[s] != null ? '<span class="chip ' + s + '">' + STAT_LABEL[s] + ' ' + fmt(it.row[s]) + '</span>' : ''; }).join('') + '<em>' + lbl + '</em></span></li>';
+      return '<li><span>' + esc(it.row.name) + rarBadge(it.rar) + '</span><span class="chips tiny">' + STATS.map(function (s) { return it.row[s] != null ? '<span class="chip ' + s + '">' + STAT_LABEL[s] + ' ' + fmt(it.row[s]) + '</span>' : ''; }).join('') + '<em>' + lbl + '</em></span></li>';
     }).join('') + '</ul></details>';
     var ready = rep.created + rep.completed + rep.updated + rep.unchanged;
     h += '<div class="row gap"><button class="btn primary big" data-act="job-save" data-job="' + job.id + '">Enregistrer dans la base</button></div>';
     if (rep.toconfirm) h += '<p class="muted small">Les ' + rep.toconfirm + ' joueur' + (rep.toconfirm > 1 ? 's' : '') + ' à confirmer seront ignorés si vous enregistrez maintenant.</p>';
     return h + '</article>';
+  }
+  function rarBadge(k) {
+    if (!k) return '';
+    return ' <span class="rarbadge"><i class="rdot r-' + k + '"></i>' + esc(C.rarName(k)) + '</span>';
   }
   function playerChipsText(p) {
     return STATS.map(function (s) { return STAT_LABEL[s] + ' ' + (p[s] == null ? '—' : fmt(p[s])); }).join(' · ');
@@ -4179,7 +4525,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
     if (!Object.keys(S.db.players).length) return '<p class="muted pad">Aucun joueur pour l\'instant. Importez un classement dans l\'onglet « Importer ».</p>';
     if (!list.length) return '<p class="muted pad">Aucun joueur ne correspond.</p>';
     h += '<ul class="plist">' + list.slice(0, S.limit).map(function (p) {
-      return '<li><button class="prow" data-act="edit-player" data-id="' + esc(p.id) + '"><span class="pn"><b>' + esc(p.name) + '</b><small>' + [p.pos, p.club].filter(Boolean).map(esc).join(' · ') + '</small></span><span class="chips tiny">' + playerChips(p) + '</span></button></li>';
+      return '<li><button class="prow" data-act="edit-player" data-id="' + esc(p.id) + '"><span class="pn"><b>' + esc(p.name) + '</b>' + rarBadge(p.rar) + '<small>' + [p.pos, p.club].filter(Boolean).map(esc).join(' · ') + '</small></span><span class="chips tiny">' + playerChips(p) + '</span></button></li>';
     }).join('') + '</ul>';
     if (list.length > S.limit) h += '<button class="btn" data-act="more-players">Afficher plus (' + (list.length - S.limit) + ' restants)</button>';
     return h;
@@ -4204,7 +4550,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
     var h = '<section class="card"><h2 class="sec in">Doublons possibles</h2>';
     if (!S.dup.length) return h + '<p class="muted">Aucun doublon trouvé.</p><button class="btn ghost" data-act="dups-close">Fermer</button></section>';
     S.dup.forEach(function (g, gi) {
-      h += '<div class="dupg">' + g.map(function (id) { var p = S.db.players[id]; return p ? '<div class="dp"><span><b>' + esc(p.name) + '</b><small>' + esc(p.club || '') + '</small></span><span class="chips tiny">' + playerChips(p) + '</span></div>' : ''; }).join('') +
+      h += '<div class="dupg">' + g.map(function (id) { var p = S.db.players[id]; return p ? '<div class="dp"><span><b>' + esc(p.name) + '</b>' + rarBadge(p.rar) + '<small>' + esc(p.club || '') + '</small></span><span class="chips tiny">' + playerChips(p) + '</span></div>' : ''; }).join('') +
         '<button class="btn small" data-act="merge" data-g="' + gi + '">Fusionner (garder le premier)</button></div>';
     });
     return h + '<button class="btn ghost" data-act="dups-close">Fermer</button></section>';
@@ -4364,6 +4710,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
       h += '<h2>' + (m.isNew ? 'Nouveau joueur' : 'Fiche du joueur') + '</h2>';
       h += '<label class="field"><span>Nom</span><input id="e-name" type="text" value="' + esc(p.name) + '" autocomplete="off"></label>';
       h += '<div class="grid2"><label class="field"><span>Position</span><input id="e-pos" type="text" value="' + esc(p.pos || '') + '"></label><label class="field"><span>Club</span><input id="e-club" type="text" value="' + esc(p.club || '') + '"></label></div>';
+      h += '<label class="field"><span>Rareté de ces notes</span><select id="e-rar"><option value="">Inconnue (ancienne fiche)</option>' + C.RARITIES.map(function (r) { return '<option value="' + r.key + '"' + (p.rar === r.key ? ' selected' : '') + '>' + r.name + '</option>'; }).join('') + '</select></label>';
       h += '<div class="grid2"><label class="field"><span>DEF</span><input id="e-def" type="text" inputmode="decimal" value="' + (p.def == null ? '' : esc(p.def)) + '" placeholder="inconnue"></label><label class="field"><span>ATK</span><input id="e-atk" type="text" inputmode="decimal" value="' + (p.atk == null ? '' : esc(p.atk)) + '" placeholder="inconnue"></label></div>';
       h += '<p class="muted small">Laissez vide si la statistique est inconnue : elle pourra être complétée plus tard par un import.</p>';
       if (p.src && (p.src.def || p.src.atk)) h += '<p class="muted small">Sources : ' + [p.src.def ? 'DEF ← ' + esc(p.src.def) : '', p.src.atk ? 'ATK ← ' + esc(p.src.atk) : ''].filter(Boolean).join(' · ') + '</p>';
@@ -4503,6 +4850,19 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
         m = memberByKey(d.key); if (m) { m.skills = m.skills || {}; var nn = (m.skills[d.sk] || 0) + 1; m.skills[d.sk] = Math.min(9, nn); } renderTab(); break;
       case 'skill-minus':
         m = memberByKey(d.key); if (m && m.skills) { m.skills[d.sk] = Math.max(0, (m.skills[d.sk] || 0) - 1); } renderTab(); break;
+      case 'sheet-close': S.sheet = null; renderTab(); break;
+      case 'sheet-rar': if (S.sheet) { S.sheet.rar = S.sheet.rar === d.rar ? null : d.rar; S.sheet.name = ($('#sh-name') || {}).value || S.sheet.name; S.sheet.def = numOrNull(($('#sh-def') || {}).value); S.sheet.atk = numOrNull(($('#sh-atk') || {}).value); S.sheet.pos = ($('#sh-pos') || {}).value || null; } renderTab(); break;
+      case 'sheet-save':
+        if (S.sheet) {
+          var sh = S.sheet; sh.name = (($('#sh-name') || {}).value || '').trim(); sh.def = numOrNull(($('#sh-def') || {}).value); sh.atk = numOrNull(($('#sh-atk') || {}).value); sh.pos = ($('#sh-pos') || {}).value || null;
+          if (!sh.name) { toast('Entrez le nom du joueur'); break; }
+          if (!sh.rar) { toast('Choisissez la rareté de la carte'); break; }
+          if (sh.def == null && sh.atk == null) { toast('Entrez au moins la DEF ou l\'ATK'); break; }
+          sheetSave(sh); renderTab();
+        }
+        break;
+      case 'rar':
+        m = memberByKey(d.key); if (m) { m.rar = m.rar === d.rar ? null : d.rar; m.rarAuto = false; } renderTab(); break;
       case 'fond':
         m = memberByKey(d.key); if (m) { m.fond = m.fond === d.fd ? null : d.fd; m.fondAuto = false; } renderTab(); break;
       case 'skill-clear':
@@ -4553,6 +4913,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
         closeModal(); renderTab(); break;
       case 'modal-close': closeModal(); break;
       case 'hint': S.hintMode = d.v; renderTab(); break;
+      case 'job-rar': S.jobs.forEach(function (j) { if (j.id === d.job) j.rar = d.rar || null; }); renderTab(); break;
       case 'paste-go':
         var txt = ($('#paste-text') || {}).value || '';
         if (txt.trim()) startImport([new File([txt], 'texte collé.txt', { type: 'text/plain' })]);
@@ -4623,6 +4984,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
       if (def != null) p.src.def = 'saisie manuelle'; if (atk != null) p.src.atk = 'saisie manuelle';
       p.created = date;
     }
+    var rv = ($('#e-rar') || {}).value || ''; if (rv) p.rar = rv; else delete p.rar;
     p.name = name; p.pos = $('#e-pos').value.trim() || null; p.club = $('#e-club').value.trim() || null; p.def = def; p.atk = atk; p.updated = date;
     S.db.players[p.id] = p;
     var cs = {}; cs[chunkOf(p.id)] = 1; persist({ chunks: cs });
