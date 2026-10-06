@@ -1663,7 +1663,10 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
       for (var j = i + 1; j < ids.length; j++) {
         if (used[ids[j]]) continue;
         var a = keys[i], b = keys[j];
-        if (players[ids[i]].rar && players[ids[j]].rar && players[ids[i]].rar !== players[ids[j]].rar) continue; /* une fiche par rareté */
+        var pi = players[ids[i]], pj = players[ids[j]];
+        if (pi.rar && pj.rar && pi.rar !== pj.rar) continue; /* une fiche par rareté */
+        /* l'une sans rareté enregistrée : si leurs notes se contredisent, ce sont deux cartes différentes (deux raretés), pas un doublon */
+        if (!pi.rar !== !pj.rar && STATS.some(function (st) { return pi[st] != null && pj[st] != null && pi[st] !== pj[st]; })) continue;
         var s = a === b ? 1 : sim(a, b);
         if (s >= 0.88 && !(players[ids[i]].club && players[ids[j]].club && !sameClub(players[ids[i]].club, players[ids[j]].club) && a !== b)) g.push(ids[j]);
         else if (a === b) g.push(ids[j]);
@@ -1930,7 +1933,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
   /* ----- Mode serveur (application hors de Claude) : base et lecture d'images passent par le serveur ----- */
   var SERVER = !!window.SNATCH_SERVER;
   /* Mode « local » : tout reste sur l'appareil (base IndexedDB), lecture des images par OCR gratuit sur l'appareil. Aucun serveur, aucune API payante. */
-  var BUILD = '06/10 12:58';
+  var BUILD = '06/10 13:38';
   /* Blocs repliables (Nouveautés, exemple de capture) : le choix est gardé sur l'appareil */
   function uiGet(key, def) {
     try { var o = JSON.parse(localStorage.getItem('snatch.ui') || '{}'); if (o && typeof o[key] === 'boolean') return o[key]; } catch (e) { /* ignore */ }
@@ -4559,8 +4562,10 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
     var list = filteredPlayers(), h = '';
     if (!Object.keys(S.db.players).length) return '<p class="muted pad">Aucun joueur pour l\'instant. Importez un classement dans l\'onglet « Importer ».</p>';
     if (!list.length) return '<p class="muted pad">Aucun joueur ne correspond.</p>';
+    var tagged = {};
+    Object.keys(S.db.players).forEach(function (id) { var q = S.db.players[id]; if (q.rar) tagged[C.nameKey(q.name)] = 1; });
     h += '<ul class="plist">' + list.slice(0, S.limit).map(function (p) {
-      return '<li><button class="prow" data-act="edit-player" data-id="' + esc(p.id) + '"><span class="pn"><b>' + esc(p.name) + '</b>' + rarBadge(p.rar) + '<small>' + [p.pos, p.club].filter(Boolean).map(esc).join(' · ') + '</small></span><span class="chips tiny">' + playerChips(p) + '</span></button></li>';
+      return '<li><button class="prow" data-act="edit-player" data-id="' + esc(p.id) + '"><span class="pn"><b>' + esc(p.name) + '</b>' + (!p.rar && tagged[C.nameKey(p.name)] ? ' <span class="rarbadge">rareté à indiquer</span>' : rarBadge(p.rar)) + '<small>' + [p.pos, p.club].filter(Boolean).map(esc).join(' · ') + '</small></span><span class="chips tiny">' + playerChips(p) + '</span></button></li>';
     }).join('') + '</ul>';
     if (list.length > S.limit) h += '<button class="btn" data-act="more-players">Afficher plus (' + (list.length - S.limit) + ' restants)</button>';
     return h;
