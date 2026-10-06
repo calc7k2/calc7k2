@@ -1493,8 +1493,8 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
 
   /* Competences (confirmees par les captures du jeu). Seuls DEF/ATK sont calcules ; Income ignore ; Crit non inclus. */
   var SKILLS = [
-    { key: 'attacker', name: 'Attacker', def: 0, atk: 1, crit: 0 },
-    { key: 'defender', name: 'Defender', def: 1, atk: 0, crit: 0 },
+    { key: 'attacker', name: 'Attacker', def: 0, atk: 1, crit: 10 },
+    { key: 'defender', name: 'Defender', def: 1, atk: 0, crit: 10 },
     { key: 'captain', name: 'Captain', def: 1, atk: 1, crit: 0 },
     { key: 'onfire', name: 'On Fire', def: 0, atk: 2, crit: 0 },
     { key: 'vision', name: 'Vision', def: 0, atk: 1, crit: 0 },
@@ -1933,7 +1933,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
   /* ----- Mode serveur (application hors de Claude) : base et lecture d'images passent par le serveur ----- */
   var SERVER = !!window.SNATCH_SERVER;
   /* Mode « local » : tout reste sur l'appareil (base IndexedDB), lecture des images par OCR gratuit sur l'appareil. Aucun serveur, aucune API payante. */
-  var BUILD = '06/10 13:38';
+  var BUILD = '07/10 01:46';
   /* Blocs repliables (Nouveautés, exemple de capture) : le choix est gardé sur l'appareil */
   function uiGet(key, def) {
     try { var o = JSON.parse(localStorage.getItem('snatch.ui') || '{}'); if (o && typeof o[key] === 'boolean') return o[key]; } catch (e) { /* ignore */ }
@@ -1974,6 +1974,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
   /* Historique des mises à jour (affiché dans Réglages) : une ligne simple par amélioration, la plus récente en premier.
      À compléter à chaque nouvelle version. */
   var NEWS = [
+    { when: '7 octobre', title: 'Attacker et Defender : +10 % de critique', text: 'Les compétences Attacker (+1 ATK) et Defender (+1 DEF) ajoutent maintenant aussi +10 % de chance de critique, comme dans le jeu.' },
     { when: '6 octobre', title: 'Clutch, entrée en stade et fiches dans Importer', text: 'Nouvelle compétence Clutch (+4 ATK, +10 % de critique). Le mot de passe n\'a plus besoin d\'être validé : l\'application s\'ouvre dès qu\'il est bon, sur un nouvel écran d\'entrée. Importer accepte aussi plusieurs captures de la page « Carte » d\'un coup : chaque joueur est enregistré avec sa rareté, et un joueur déjà présent avec les mêmes notes est signalé « déjà à jour ».' },
     { when: '6 octobre', title: 'Fiche d\'une carte : enregistrée dans la base', text: 'Envoyez la capture de la page « Carte » d\'un joueur (celle qui montre Rareté, Défense, Attaque et Poste) : l\'application lit le nom, la rareté, la DEF, l\'ATK et le poste, puis enregistre le joueur dans la base pour cette rareté s\'il n\'y est pas encore (ou met ses notes à jour). Si un détail est illisible, elle vous le demande avant d\'enregistrer.' },
     { when: '6 octobre', title: 'Raretés des cartes : une note par rareté', text: 'Un même joueur n\'a pas les mêmes notes en Legendary, GOAT, Star, Pro ou Common. La base garde maintenant une fiche par rareté : les PDF Snatch Watch sont lus avec leurs icônes, la rareté de chaque carte est lue sur son cadre (et se corrige d\'un tap), et seule la note de la bonne rareté est utilisée. Si la base n\'a pas cette rareté, la note d\'une autre rareté n\'est jamais reprise : la note vue sur la carte ou l\'estimation (moins bon joueur du poste de même rareté − 1) la remplace.' },
