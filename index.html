@@ -1809,7 +1809,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
   /* ----- Mode serveur (application hors de Claude) : base et lecture d'images passent par le serveur ----- */
   var SERVER = !!window.SNATCH_SERVER;
   /* Mode « local » : tout reste sur l'appareil (base IndexedDB), lecture des images par OCR gratuit sur l'appareil. Aucun serveur, aucune API payante. */
-  var BUILD = '06/10 03:49';
+  var BUILD = '06/10 10:17';
   /* Blocs repliables (Nouveautés, exemple de capture) : le choix est gardé sur l'appareil */
   function uiGet(key, def) {
     try { var o = JSON.parse(localStorage.getItem('snatch.ui') || '{}'); if (o && typeof o[key] === 'boolean') return o[key]; } catch (e) { /* ignore */ }
@@ -1850,7 +1850,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
   /* Historique des mises à jour (affiché dans Réglages) : une ligne simple par amélioration, la plus récente en premier.
      À compléter à chaque nouvelle version. */
   var NEWS = [
-    { when: '6 octobre', title: 'Vidéo, mot de passe et résultats simplifiés', text: 'Importer : vous pouvez maintenant envoyer une vidéo de la liste de joueurs (enregistrement d\'écran qui défile), de n\'importe quelle durée : chaque joueur est enregistré une seule fois, avec ses notes DEF/ATK et son poste ; ce qui est incertain reste vide. Réglages : un mot de passe optionnel, que vous choisissez et changez vous-même. Adversaire : résultats plus lisibles (total de base, bonus, puis critiques à part). Une note inconnue est remplacée par le 50e de son poste moins 1. Les noms ne se chevauchent plus dans Analyse.' },
+    { when: '6 octobre', title: 'Vidéo, mot de passe et résultats simplifiés', text: 'Importer : vous pouvez maintenant envoyer une vidéo de la liste de joueurs (enregistrement d\'écran qui défile), de n\'importe quelle durée : chaque joueur est enregistré une seule fois, avec ses notes DEF/ATK et son poste ; ce qui est incertain reste vide. Réglages : un mot de passe optionnel, que vous choisissez et changez vous-même. Adversaire : résultats plus lisibles (total de base, bonus, puis critiques à part). Une note inconnue est remplacée par celle du moins bon joueur connu de son poste (toute la base), moins 1. Les noms ne se chevauchent plus dans Analyse.' },
     { when: '4 octobre', title: 'Bonus de club en haut de page', text: 'Le bonus de club est maintenant tout en haut d\'Adversaire et de Mon équipe. Les champs « Bonus DEF » et « Bonus ATK » inutiles ont été retirés. Les captures sont aussi mieux lues quand le bandeau du bas cache une rangée, quel que soit le fond.' },
     { when: '4 octobre', title: 'Analyse du match', text: 'Nouvel onglet « Analyse » (analyse de fin de match) : envoyez la capture de l\'écran de résultat d\'un duel et vous obtenez le verdict, le détail ligne par ligne, les critiques de chaque camp et ce qui aurait changé sans eux ou sans le bonus Club. Les matchs sont gardés pour calculer votre taux réel de critiques. Les Réglages sont maintenant sur la roue dentée en haut à droite.' },
     { when: '4 octobre', title: 'Onglets plus clairs et duel animé', text: '« Analyser » devient « Adversaire ». Votre équipe a maintenant son onglet « Mon équipe », et l\'onglet « Duel » rassemble le verdict, les critiques et le détail des deux équipes, avec un petit match animé : vos joueurs attaquent, tirent, marquent ou se font arrêter (rejouable, avec tirage au sort).' },
@@ -2324,7 +2324,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
       created: rep.created, completed: rep.completed, updated: rep.updated, unchanged: rep.unchanged,
       skipped: rep.skipped + rep.toconfirm, hint: job.hint || null
     };
-    var fl = job.noFloors ? {} : C.rankingFloorsByPos(job.rows, 50), flChanged = false;
+    var fl = {}, flChanged = false; /* l'ancien plancher « 50e » n'est plus utilisé */
     S.db.floors.pos = S.db.floors.pos || {};
     Object.keys(fl).forEach(function (pp) {
       STATS.forEach(function (st) {
@@ -3102,15 +3102,26 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
 
   var POS_FR_S = { GK: 'gardien', DEF: 'DEF', MID: 'MID', FWD: 'FWD' };
   var POS_FR = { GK: 'Gardiens', DEF: 'Défenseurs', MID: 'Milieux', FWD: 'Attaquants' };
-  /* Règle « 50e − 1 » : uniquement si la statistique est inconnue, et en ne regardant que le classement du MÊME poste que le joueur */
+  /* Règle « moins bon − 1 » : uniquement si la statistique est inconnue. On prend le moins bon joueur CONNU du même poste dans toute la base
+     (tous les fichiers importés), pour la statistique qui manque, puis on retire 1. Le 50e du classement n'est plus utilisé. */
+  function worstByPos() {
+    var out = {};
+    Object.keys(S.db.players).forEach(function (id) {
+      var p = S.db.players[id], pos = C.normPos(p.pos);
+      if (pos !== 'GK' && pos !== 'DEF' && pos !== 'MID' && pos !== 'FWD') return;
+      STATS.forEach(function (s) {
+        if (p[s] == null) return;
+        var o = (out[pos] = out[pos] || {})[s] = out[pos][s] || { value: p[s], n: 0, name: p.name };
+        o.n++; if (p[s] < o.value) { o.value = p[s]; o.name = p.name; }
+      });
+    });
+    return out;
+  }
   function floorFor(m, p, s) {
-    var pos = C.normPos((p && p.pos) || m.pos), f = S.db.floors || {};
+    var pos = C.normPos((p && p.pos) || m.pos);
     if (pos !== 'GK' && pos !== 'DEF' && pos !== 'MID' && pos !== 'FWD') return null;
-    var hit = f.pos && f.pos[pos] && f.pos[pos][s];
-    if (hit) return { value: hit.value, pos: pos, n: hit.n };
-    /* anciens classements importés avant les postes : DEF seul vaut pour les défenseurs, ATK seul pour les attaquants */
-    if (f[s] && ((s === 'def' && pos === 'DEF') || (s === 'atk' && pos === 'FWD'))) return { value: f[s].value, pos: pos, n: 50 };
-    return null;
+    var w = worstByPos(), hit = w[pos] && w[pos][s];
+    return hit ? { value: hit.value, pos: pos, n: hit.n, who: hit.name } : null;
   }
   function effStats(m) {
     var p = m.id ? S.db.players[m.id] : null;
@@ -3558,7 +3569,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
           '<button class="link" data-act="toggle-seen" data-key="' + m.key + '" data-stat="' + s + '">' + (useSeen ? 'Utiliser la base (' + fmt(d.db) + ')' : 'Utiliser la capture (' + fmt(d.seen) + ')') + '</button></p>';
       }
     });
-    if (!m.id && !m.candidates.length) h += '<p class="note small">Ce joueur n\'est pas dans votre base (ou son nom est trop abîmé) : ses notes inconnues sont estimées avec le 50e de son poste − 1. Touchez « Chercher dans la base » si vous savez qui c\'est.</p>';
+    if (!m.id && !m.candidates.length) h += '<p class="note small">Ce joueur n\'est pas dans votre base (ou son nom est trop abîmé) : ses notes inconnues sont estimées avec le moins bon joueur de son poste − 1. Touchez « Chercher dans la base » si vous savez qui c\'est.</p>';
     if (!m.id && m.candidates.length) {
       h += '<div class="cands"><div class="lbl">Est-ce l\'un de ces joueurs ?</div>';
       m.candidates.forEach(function (c) {
@@ -3632,13 +3643,13 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
     STATS.forEach(function (s) { h += renderStatResult(s, r.calc[s]); });
     h += renderCritPanel();
     var floorTxt = (function () {
-      var ps = S.db.floors.pos || {}, parts = [];
+      var ps = worstByPos(), parts = [];
       ['GK', 'DEF', 'MID', 'FWD'].forEach(function (pp) { STATS.forEach(function (st) { var x = ps[pp] && ps[pp][st]; if (x) parts.push(POS_FR_S[pp] + ' ' + STAT_LABEL[st] + ' ' + fmt(x.value - 1)); }); });
-      return parts.length ? ' (' + parts.join(', ') + ')' : ' (importez un classement avec les postes pour l\'activer)';
+      return parts.length ? ' (valeurs actuelles : ' + parts.join(', ') + ')' : ' (importez des joueurs avec leur poste pour l\'activer)';
     })();
     h += '<details class="card more"><summary>Règles utilisées</summary><p class="muted small">Défense : le joueur principal est un défenseur. Attaque : le joueur principal est un attaquant. Principal ' + fmt(rules.mainPct) + ' %, chaque autre carte ' + fmt(rules.supportPct) + ' %, ' +
       ({ ceil: 'arrondi à l\'entier supérieur', round: 'arrondi à l\'entier le plus proche', floor: 'arrondi à l\'entier inférieur', none: 'sans arrondi' }[rules.rounding]) + ' pour chaque support. ' +
-      plural(r.calc.size, 'joueur', 'joueurs') + ' dans l\'équipe.</p><p class="muted small">Une note inconnue est remplacée par le 50e de son poste moins 1' + floorTxt + '.</p></details>';
+      plural(r.calc.size, 'joueur', 'joueurs') + ' dans l\'équipe.</p><p class="muted small">Une note inconnue est remplacée par celle du moins bon joueur connu de son poste (dans toute votre base), moins 1' + floorTxt + '.</p></details>';
     return h;
   }
 
@@ -3674,7 +3685,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
         var raw = l.base == null ? null : l.base * l.pct / 100;
         var part = l.contrib == null ? '<span class="warn">manquante</span>' : '<b>' + fmt(l.contrib) + '</b>';
         var calc = l.base == null ? '—' : '<span class="nw">' + fmt(l.base) + '\u00a0×\u00a0' + fmt(l.pct) + '\u00a0%</span>' + (l.skill ? '<small>' + (l.skill > 0 ? '+' : '−') + fmt(Math.abs(l.skill)) + ' compét.</small>' : '') + (raw != null && l.contrib != null && Math.abs(raw - l.contrib) > 1e-9 ? '<small>' + fmt(raw) + ' arrondi</small>' : '');
-        h += '<tr class="' + l.role + '"><td>' + esc(l.name) + '<small>' + (l.role === 'principal' ? 'principal' : 'support') + (l.est ? ' · note estimée (' + (l.estN != null && l.estN < 50 ? 'dernier ' : '50e ') + (POS_FR_S[l.estPos] || '') + ' − 1)' : '') + '</small></td><td>' + calc + '</td><td>' + part + '</td></tr>';
+        h += '<tr class="' + l.role + '"><td>' + esc(l.name) + '<small>' + (l.role === 'principal' ? 'principal' : 'support') + (l.est ? ' · note estimée (' + 'moins bon ' + (POS_FR_S[l.estPos] || '') + ' − 1)' : '') + '</small></td><td>' + calc + '</td><td>' + part + '</td></tr>';
       });
       h += '</tbody><tfoot>';
       h += '<tr class="base"><td colspan="2">Total de base (avant bonus)</td><td>' + fmt(c.subtotal) + '</td></tr>';
@@ -4708,7 +4719,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
       list = top.map(function (x) { return S.db.players[x.id]; });
       fuzzy = list.length > 0;
     }
-    if (!list.length) return '<p class="muted pad">Aucun joueur trouvé dans la base. S\'il n\'est dans aucun classement importé, ses notes inconnues sont estimées avec le 50e de son poste − 1.</p>';
+    if (!list.length) return '<p class="muted pad">Aucun joueur trouvé dans la base. S\'il n\'est dans aucun classement importé, ses notes inconnues sont estimées avec le moins bon joueur de son poste − 1.</p>';
     return (fuzzy ? '<p class="muted small pad">Aucun nom exact : voici les plus proches.</p>' : '') + '<ul class="plist">' + list.slice(0, 40).map(function (p) {
       return '<li><button class="prow" data-act="pick-do" data-id="' + esc(p.id) + '"><span class="pn"><b>' + esc(p.name) + '</b><small>' + [p.pos, p.club].filter(Boolean).map(esc).join(' · ') + '</small></span><span class="chips tiny">' + playerChips(p) + '</span></button></li>';
     }).join('') + '</ul>' + (list.length > 40 ? '<p class="muted small pad">Affinez la recherche pour voir les autres.</p>' : '');
