@@ -437,7 +437,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
 .mscore { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; margin: 12px 0 8px; }
 .msd { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
 .msd .who { font-weight: 600; overflow-wrap: anywhere; }
-.msd .pname { font-size: 13px; overflow-wrap: anywhere; }
+.msd .mname { font-size: 13px; overflow-wrap: anywhere; }
 .msd .tot { font-family: var(--f-num); font-size: 44px; line-height: 1; color: var(--muted); font-variant-numeric: tabular-nums; }
 .msd .tot.w { color: var(--accent); }
 .msvs { font-family: var(--f-num); font-weight: 700; font-size: 22px; color: var(--muted); }
@@ -465,6 +465,28 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
 .mf input { width: 100%; min-height: 40px; padding: 6px 8px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); font-size: 16px; }
 
 .mwhoc { display: flex; gap: 12px; align-items: flex-start; } .mwhoc > div { min-width: 0; flex: 1; } .mwhoc p { margin: 3px 0; line-height: 1.4; } .mcard.sm { width: 64px; flex: none; }
+
+/* Verrou */
+html.locked body > :not(#lock):not(script) { visibility: hidden; }
+#lock { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; padding: 24px 16px; background: var(--bg); color: var(--ink); overflow: auto; visibility: visible; }
+.lockbox { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 14px; text-align: center; align-items: stretch; }
+.lockbox h1 { margin: 0; font-family: var(--f-num); text-transform: uppercase; letter-spacing: .03em; font-size: 28px; }
+.lockbox .lockicon { width: 72px; height: 72px; margin: 0 auto; display: grid; place-items: center; border-radius: 50%; background: var(--accent-soft); color: var(--accent); }
+.lockbox .lockicon svg { width: 36px; height: 36px; }
+.lockbox form { display: flex; flex-direction: column; gap: 10px; }
+.lockbox input { width: 100%; min-height: 52px; padding: 10px 14px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink); font-size: 18px; text-align: center; }
+.lockbox details { text-align: left; }
+
+/* Résultats simplifiés */
+.sumrow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.sumtile { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 16px; background: var(--accent-soft); border: 1.5px solid var(--line); min-width: 0; }
+.sumtile small { color: var(--muted); font-size: 13px; }
+.sumtile b { font-family: var(--f-num); font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+table.calc td small, table.calc th small { display: block; color: var(--muted); font-weight: 400; }
+table.calc td:nth-child(2) { text-align: right; } .nw { white-space: nowrap; } table.calc td:nth-child(2) small { display: block; }
+table.calc tfoot tr.bn td { font-weight: 400; color: var(--muted); }
+table.calc tfoot tr.base td { font-weight: 600; border-top: 1.5px solid var(--line); }
+details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
 
 </style></head><body>
 <header class="top"><div class="brand">Mon <span>calculateur</span></div><div id="status" class="status" role="status"></div><button class="gear" data-tab="settings" aria-label="Réglages"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h9m4 0h1M5 17h3m4 0h7M5 12h1m4 0h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button></header>
@@ -1326,6 +1348,37 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     return out;
   }
 
+  /* Planchers PAR POSTE : pour chaque statistique et chaque poste (GK, DEF, MID, FWD), note du 50e joueur de ce poste dans le classement importé
+     (ou du dernier, s'il y en a moins de 50). On ne compare qu'avec les joueurs du même poste. Un fichier qui contient les deux statistiques
+     n'est utilisé pour une statistique que s'il est bien trié sur celle-ci. Un classement sans postes (DEF seul / ATK seul) vaut pour DEF / FWD. */
+  function rankingFloorsByPos(rows, size) {
+    size = size || 50;
+    var out = {};
+    STATS.forEach(function (s) {
+      var other = s === 'def' ? 'atk' : 'def';
+      var srows = rows.filter(function (r) { return r[s] != null; });
+      if (srows.length < 2) return;
+      var single = srows.every(function (r) { return r[other] == null; });
+      if (!single) {
+        var ok = 0;
+        for (var i = 1; i < srows.length; i++) if (srows[i][s] <= srows[i - 1][s]) ok++;
+        if (ok / (srows.length - 1) < 0.9) return;
+      }
+      var groups = {}, noPos = [];
+      srows.forEach(function (r) {
+        var p = normPos(r.pos);
+        if (p === 'GK' || p === 'DEF' || p === 'MID' || p === 'FWD') (groups[p] = groups[p] || []).push(r[s]);
+        else if (single) noPos.push(r[s]);
+      });
+      if (noPos.length >= size) { var rp = s === 'def' ? 'DEF' : 'FWD'; groups[rp] = (groups[rp] || []).concat(noPos); }
+      Object.keys(groups).forEach(function (p) {
+        var v = groups[p].slice().sort(function (a, b) { return b - a; });
+        (out[p] = out[p] || {})[s] = { value: v[Math.min(size, v.length) - 1], n: v.length };
+      });
+    });
+    return out;
+  }
+
   /* Competences (confirmees par les captures du jeu). Seuls DEF/ATK sont calcules ; Income ignore ; Crit non inclus. */
   var SKILLS = [
     { key: 'attacker', name: 'Attacker', def: 0, atk: 1 },
@@ -1372,7 +1425,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
           var base0 = p[s] == null ? null : p[s];
           var base = base0 == null ? null : base0 + sk;
           return {
-            index: i, name: p.name, skill: sk, base0: base0, role: isMain ? 'principal' : 'support', pct: pct, est: !!p[s + 'Est'],
+            index: i, name: p.name, skill: sk, base0: base0, role: isMain ? 'principal' : 'support', pct: pct, est: !!p[s + 'Est'], estPos: p.pos || null, estN: p.estInfo && p.estInfo[s] ? p.estInfo[s].n : null,
             base: base, contrib: contribution(base, pct, rules.rounding)
           };
         });
@@ -1670,7 +1723,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     buildIndex: buildIndex, findMatch: findMatch, applyImport: applyImport,
     parseSnatchWatch: parseSnatchWatch, pdfItemsToText: pdfItemsToText, prettyClub: prettyClub, parseCSV: parseCSV, parseTable: parseTable, parseText: parseText, parseLine: parseLine, detectHint: detectHint,
     resolveUnknown: resolveUnknown, normalizeAiRows: normalizeAiRows, normPos: normPos,
-    roleStat: roleStat, duelOdds: duelOdds, MUTATIONS: MUTATIONS, critChance: critChance, cleanOcrName: cleanOcrName, simFlex: simFlex, SKILLS: SKILLS, skillAdd: skillAdd, rankingFloor: rankingFloor, matchTeam: matchTeam, matchOcrName: matchOcrName, matchExtraNames: matchExtraNames, calcTeam: calcTeam, contribution: contribution,
+    roleStat: roleStat, duelOdds: duelOdds, MUTATIONS: MUTATIONS, critChance: critChance, cleanOcrName: cleanOcrName, simFlex: simFlex, SKILLS: SKILLS, skillAdd: skillAdd, rankingFloor: rankingFloor, rankingFloorsByPos: rankingFloorsByPos, matchTeam: matchTeam, matchOcrName: matchOcrName, matchExtraNames: matchExtraNames, calcTeam: calcTeam, contribution: contribution,
     findDuplicates: findDuplicates, parseMatchWords: parseMatchWords, matchAnalysis: matchAnalysis, mergePlayers: mergePlayers, randomId: randomId, clonePlayer: clonePlayer
   };
 
@@ -1729,7 +1782,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   /* ---------- État ---------- */
   var S = {
     tab: 'analyse', ready: false, storage: 'memory', mode: 'browser', note: '',
-    db: { players: {}, imports: [], rules: Object.assign({}, C.DEFAULT_RULES), floors: { def: null, atk: null } },
+    db: { players: {}, imports: [], rules: Object.assign({}, C.DEFAULT_RULES), floors: { def: null, atk: null, pos: {} } },
     sample: null, limits: null,
     team: { state: 'idle', members: [], err: '', img: null, ctl: null },
     bonus: { def: '', atk: '', clubDef: '', clubAtk: '', critDef: '', critAtk: '' },
@@ -1756,7 +1809,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   /* ----- Mode serveur (application hors de Claude) : base et lecture d'images passent par le serveur ----- */
   var SERVER = !!window.SNATCH_SERVER;
   /* Mode « local » : tout reste sur l'appareil (base IndexedDB), lecture des images par OCR gratuit sur l'appareil. Aucun serveur, aucune API payante. */
-  var BUILD = '04/10 21:26';
+  var BUILD = '06/10 03:49';
   /* Blocs repliables (Nouveautés, exemple de capture) : le choix est gardé sur l'appareil */
   function uiGet(key, def) {
     try { var o = JSON.parse(localStorage.getItem('snatch.ui') || '{}'); if (o && typeof o[key] === 'boolean') return o[key]; } catch (e) { /* ignore */ }
@@ -1797,6 +1850,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   /* Historique des mises à jour (affiché dans Réglages) : une ligne simple par amélioration, la plus récente en premier.
      À compléter à chaque nouvelle version. */
   var NEWS = [
+    { when: '6 octobre', title: 'Vidéo, mot de passe et résultats simplifiés', text: 'Importer : vous pouvez maintenant envoyer une vidéo de la liste de joueurs (enregistrement d\'écran qui défile), de n\'importe quelle durée : chaque joueur est enregistré une seule fois, avec ses notes DEF/ATK et son poste ; ce qui est incertain reste vide. Réglages : un mot de passe optionnel, que vous choisissez et changez vous-même. Adversaire : résultats plus lisibles (total de base, bonus, puis critiques à part). Une note inconnue est remplacée par le 50e de son poste moins 1. Les noms ne se chevauchent plus dans Analyse.' },
     { when: '4 octobre', title: 'Bonus de club en haut de page', text: 'Le bonus de club est maintenant tout en haut d\'Adversaire et de Mon équipe. Les champs « Bonus DEF » et « Bonus ATK » inutiles ont été retirés. Les captures sont aussi mieux lues quand le bandeau du bas cache une rangée, quel que soit le fond.' },
     { when: '4 octobre', title: 'Analyse du match', text: 'Nouvel onglet « Analyse » (analyse de fin de match) : envoyez la capture de l\'écran de résultat d\'un duel et vous obtenez le verdict, le détail ligne par ligne, les critiques de chaque camp et ce qui aurait changé sans eux ou sans le bonus Club. Les matchs sont gardés pour calculer votre taux réel de critiques. Les Réglages sont maintenant sur la roue dentée en haut à droite.' },
     { when: '4 octobre', title: 'Onglets plus clairs et duel animé', text: '« Analyser » devient « Adversaire ». Votre équipe a maintenant son onglet « Mon équipe », et l\'onglet « Duel » rassemble le verdict, les critiques et le détail des deux équipes, avec un petit match animé : vos joueurs attaquent, tirent, marquent ou se font arrêter (rejouable, avec tirage au sort).' },
@@ -2270,9 +2324,16 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
       created: rep.created, completed: rep.completed, updated: rep.updated, unchanged: rep.unchanged,
       skipped: rep.skipped + rep.toconfirm, hint: job.hint || null
     };
-    var fl = C.rankingFloor(job.rows, 50), flChanged = false;
-    STATS.forEach(function (st) {
-      if (fl[st] != null) { S.db.floors[st] = { value: fl[st], date: entry.date, file: job.name }; entry.floor = (entry.floor || '') + STAT_LABEL[st] + ' : 50e = ' + fmt(fl[st]) + ' '; flChanged = true; }
+    var fl = job.noFloors ? {} : C.rankingFloorsByPos(job.rows, 50), flChanged = false;
+    S.db.floors.pos = S.db.floors.pos || {};
+    Object.keys(fl).forEach(function (pp) {
+      STATS.forEach(function (st) {
+        var nf = fl[pp][st]; if (!nf) return;
+        var cur = S.db.floors.pos[pp] && S.db.floors.pos[pp][st];
+        if (cur && cur.n > nf.n) return; /* une liste plus petite ne remplace pas un classement plus complet */
+        (S.db.floors.pos[pp] = S.db.floors.pos[pp] || {})[st] = { value: nf.value, n: nf.n, date: entry.date, file: job.name };
+        entry.floor = (entry.floor || '') + POS_FR[pp] + ' ' + STAT_LABEL[st] + ' : ' + (nf.n >= 50 ? '50e' : 'dernier (' + nf.n + ')') + ' = ' + fmt(nf.value) + ' · '; flChanged = true;
+      });
     });
     S.db.imports.unshift(entry);
     job.saved = entry;
@@ -3039,6 +3100,18 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     }).then(function () { S.team.ctl = null; renderTab(); });
   }
 
+  var POS_FR_S = { GK: 'gardien', DEF: 'DEF', MID: 'MID', FWD: 'FWD' };
+  var POS_FR = { GK: 'Gardiens', DEF: 'Défenseurs', MID: 'Milieux', FWD: 'Attaquants' };
+  /* Règle « 50e − 1 » : uniquement si la statistique est inconnue, et en ne regardant que le classement du MÊME poste que le joueur */
+  function floorFor(m, p, s) {
+    var pos = C.normPos((p && p.pos) || m.pos), f = S.db.floors || {};
+    if (pos !== 'GK' && pos !== 'DEF' && pos !== 'MID' && pos !== 'FWD') return null;
+    var hit = f.pos && f.pos[pos] && f.pos[pos][s];
+    if (hit) return { value: hit.value, pos: pos, n: hit.n };
+    /* anciens classements importés avant les postes : DEF seul vaut pour les défenseurs, ATK seul pour les attaquants */
+    if (f[s] && ((s === 'def' && pos === 'DEF') || (s === 'atk' && pos === 'FWD'))) return { value: f[s].value, pos: pos, n: 50 };
+    return null;
+  }
   function effStats(m) {
     var p = m.id ? S.db.players[m.id] : null;
     var out = { src: {} };
@@ -3048,7 +3121,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
       if (m.useSeen && m.useSeen[s] && seen != null) { v = seen; src = 'capture'; }
       else if (dbv != null) { v = dbv; src = 'base'; }
       else if (seen != null) { v = seen; src = 'capture'; }
-      if (v == null && S.db.floors && S.db.floors[s]) { v = S.db.floors[s].value - 1; src = 'estimé'; }
+      if (v == null) { var fp = floorFor(m, p, s); if (fp) { v = fp.value - 1; src = 'estimé'; out.estInfo = out.estInfo || {}; out.estInfo[s] = fp; } }
       out[s] = v; out.src[s] = src;
       if (dbv != null && seen != null && dbv !== seen) { out.src[s + 'Diff'] = { db: dbv, seen: seen }; }
     });
@@ -3058,7 +3131,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   function teamCalc() {
     var members = S.team.members.map(function (m) {
       var e = effStats(m), p = m.id ? S.db.players[m.id] : null;
-      return { critP: (function () { var mu = C.MUTATIONS.filter(function (k) { return k.key === m.fond; })[0]; return mu ? mu.crit / 100 : 0; })(), skills: m.skills || null, name: p ? p.name : m.name, pos: (p && p.pos) || m.pos || null, def: e.def, atk: e.atk, defEst: e.src.def === 'estimé', atkEst: e.src.atk === 'estimé' };
+      return { critP: (function () { var mu = C.MUTATIONS.filter(function (k) { return k.key === m.fond; })[0]; return mu ? mu.crit / 100 : 0; })(), skills: m.skills || null, name: p ? p.name : m.name, pos: (p && p.pos) || m.pos || null, def: e.def, atk: e.atk, defEst: e.src.def === 'estimé', atkEst: e.src.atk === 'estimé', estInfo: e.estInfo || null };
     });
     var mains = [];
     S.team.members.forEach(function (m, i) { if (!S.mainsOff[m.key]) mains.push(i); });
@@ -3288,9 +3361,9 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     if (anyRows) {
       h += '<section class="card mverdict ' + (an.attWins ? 'attw' : 'defw') + '">';
       h += '<div class="mwho">' + (an.attWins ? 'L\'attaquant gagne' : 'Le défenseur gagne') + '</div>';
-      h += '<div class="mscore"><div class="msd"><span class="role">Attaque</span>' + (cur.crops[att] ? '<img class="mcard" src="' + cur.crops[att] + '" alt="Carte de l\'attaquant">' : '') + (cur.names[att] ? '<b class="pname">' + esc(cur.names[att]) + '</b>' : '') + '<span class="who">' + esc(nm(att)) + '</span><strong class="tot' + (an.attWins ? ' w' : '') + '">' + an.attTotal + '</strong></div>';
+      h += '<div class="mscore"><div class="msd"><span class="role">Attaque</span>' + (cur.crops[att] ? '<img class="mcard" src="' + cur.crops[att] + '" alt="Carte de l\'attaquant">' : '') + (cur.names[att] ? '<b class="mname">' + esc(cur.names[att]) + '</b>' : '') + '<span class="who">' + esc(nm(att)) + '</span><strong class="tot' + (an.attWins ? ' w' : '') + '">' + an.attTotal + '</strong></div>';
       h += '<div class="msvs">VS</div>';
-      h += '<div class="msd"><span class="role">Défense</span>' + (cur.crops[defI] ? '<img class="mcard" src="' + cur.crops[defI] + '" alt="Carte du défenseur">' : '') + (cur.names[defI] ? '<b class="pname">' + esc(cur.names[defI]) + '</b>' : '') + '<span class="who">' + esc(nm(defI)) + '</span><strong class="tot' + (!an.attWins ? ' w' : '') + '">' + an.defTotal + '</strong></div></div>';
+      h += '<div class="msd"><span class="role">Défense</span>' + (cur.crops[defI] ? '<img class="mcard" src="' + cur.crops[defI] + '" alt="Carte du défenseur">' : '') + (cur.names[defI] ? '<b class="mname">' + esc(cur.names[defI]) + '</b>' : '') + '<span class="who">' + esc(nm(defI)) + '</span><strong class="tot' + (!an.attWins ? ' w' : '') + '">' + an.defTotal + '</strong></div></div>';
       if (an.attWins) h += '<p class="msum">L\'attaque l\'emporte de <b>' + an.margin + ' point' + (an.margin > 1 ? 's' : '') + '</b>. À égalité, c\'est la défense qui gagne : il lui manquait <b>' + an.margin + '</b> pour s\'imposer.</p>';
       else h += '<p class="msum">La défense l\'emporte avec <b>' + (-an.margin) + ' point' + (-an.margin > 1 ? 's' : '') + '</b> d\'avance' + (an.margin === 0 ? ' (égalité : la défense gagne)' : '') + '. Il manquait <b>' + (-an.margin + 1) + '</b> à l\'attaque pour passer devant.</p>';
       h += '</section>';
@@ -3485,7 +3558,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
           '<button class="link" data-act="toggle-seen" data-key="' + m.key + '" data-stat="' + s + '">' + (useSeen ? 'Utiliser la base (' + fmt(d.db) + ')' : 'Utiliser la capture (' + fmt(d.seen) + ')') + '</button></p>';
       }
     });
-    if (!m.id && !m.candidates.length) h += '<p class="note small">Ce joueur n\'est pas dans votre base (ou son nom est trop abîmé) : ses notes sont estimées (50e − 1). Touchez « Chercher dans la base » si vous savez qui c\'est.</p>';
+    if (!m.id && !m.candidates.length) h += '<p class="note small">Ce joueur n\'est pas dans votre base (ou son nom est trop abîmé) : ses notes inconnues sont estimées avec le 50e de son poste − 1. Touchez « Chercher dans la base » si vous savez qui c\'est.</p>';
     if (!m.id && m.candidates.length) {
       h += '<div class="cands"><div class="lbl">Est-ce l\'un de ces joueurs ?</div>';
       m.candidates.forEach(function (c) {
@@ -3538,81 +3611,87 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
 
   function renderCritPanel() {
     var ci = C.critChance(S.team.members);
-    var h = '<section class="card crit"><header class="shead"><h3>Critiques' + (OPP ? ' de mon équipe' : ' adverses') + '</h3><span class="big">' + fmt(Math.round(ci.expected * 100) / 100) + '</span></header>';
-    h += '<p class="muted small">Nombre moyen de critiques par combat. Selon le jeu, chaque carte tire son propre critique au début du combat avec la chance de son fond ; un critique multiplie seulement la note de cette carte par ' + String(ci.mult).replace('.', ',') + '. Les totaux ci-dessous ne contiennent aucun critique : l\'effet est indiqué à part.</p>';
-    if (ci.parts.some(function (p) { return p.crit; })) h += '<p class="small">' + ci.parts.filter(function (p) { return p.crit; }).map(function (p) { return esc(p.name) + ' (' + esc(p.fond) + ' ' + p.crit + '\u00a0%)'; }).join(' + ') + ' = ' + fmt(ci.raw) + '\u00a0% au total (somme des chances)</p>';
-    h += '<p class="small">Chance d\'avoir au moins un critique : <b>' + fmt(Math.round(ci.atLeastOne)) + '\u00a0%</b>.</p>';
-    if (ci.unknown) h += '<p class="note warn small">Fond non renseigné pour ' + plural(ci.unknown, 'carte', 'cartes') + ' (compté 0 %). Choisissez le fond sur chaque carte ci-dessus.</p>';
-    return h + '</section>';
+    var h = '<details class="card more crit"><summary><b>Critiques' + (OPP ? ' de mon équipe' : ' adverses') + '</b><small>' + fmt(Math.round(ci.expected * 100) / 100) + ' en moyenne · au moins un : ' + fmt(Math.round(ci.atLeastOne)) + ' %</small></summary>';
+    h += '<p class="muted small">Chaque carte tire son critique au début du combat avec la chance de son fond ; un critique multiplie seulement la note de cette carte par ' + String(ci.mult).replace('.', ',') + '. Les totaux ci-dessus n\'en contiennent aucun.</p>';
+    if (ci.parts.some(function (p) { return p.crit; })) h += '<p class="small">' + ci.parts.filter(function (p) { return p.crit; }).map(function (p) { return esc(p.name) + ' (' + esc(p.fond) + ' ' + p.crit + ' %)'; }).join(' + ') + ' = ' + fmt(ci.raw) + ' % (somme des chances)</p>';
+    if (ci.unknown) h += '<p class="note warn small">Fond non renseigné pour ' + plural(ci.unknown, 'carte', 'cartes') + ' (compté 0 %).</p>';
+    return h + '</details>';
   }
+  function rngTxt(o) { return o && o.min != null ? (o.min === o.max ? fmt(o.min) : fmt(o.min) + ' à ' + fmt(o.max)) : '—'; }
   function renderResults() {
     var r = teamCalc();
     if (!r) return '';
     if (!r.calc) return '<section class="card alert warn"><p>Cochez au moins un joueur qui peut être le joueur principal.</p></section>';
-    var rules = r.calc.rules;
+    var rules = r.calc.rules, side = OPP ? ' de mon équipe' : ' adverse';
     var h = '<div class="goalbar"><h2 class="sec in">Résultat</h2><div class="goalgif" aria-hidden="true"></div></div>';
-    h += '<p class="muted small rule">Défense : le joueur principal est un défenseur. Attaque : le joueur principal est un attaquant. Les autres cartes comptent au taux support. Un joueur sans note (absent du classement) reçoit la note du 50e moins 1' +
-      (S.db.floors.def || S.db.floors.atk ? ' (' + STATS.filter(function (x) { return S.db.floors[x]; }).map(function (x) { return STAT_LABEL[x] + ' ' + fmt(S.db.floors[x].value - 1); }).join(', ') + ')' : ' (importez le Top 50 pour l\'activer)') + '.</p>';
+    h += '<div class="sumrow">' + STATS.map(function (s) {
+      var o = r.calc[s];
+      return '<div class="sumtile ' + s + '"><small>' + (s === 'def' ? 'Défense' : 'Attaque') + side + '</small><b>' + (o.none ? '—' : o.min == null ? 'incomplet' : rngTxt(o)) + '</b></div>';
+    }).join('') + '</div>';
     if (r.calc.unknownPos && r.calc.unknownPos.length) h += '<p class="note warn small">Poste inconnu (compté comme support, ne peut pas être joueur principal) : ' + r.calc.unknownPos.map(esc).join(', ') + '. Renseignez son poste dans sa fiche.</p>';
-    h += '<p class="muted small rule">Règle : principal ' + fmt(rules.mainPct) + ' %, chaque support ' + fmt(rules.supportPct) + ' %, ' +
-      ({ ceil: 'arrondi à l\'entier supérieur', round: 'arrondi à l\'entier le plus proche', floor: 'arrondi à l\'entier inférieur', none: 'sans arrondi' }[rules.rounding]) + ' pour chaque support. ' +
-      plural(r.calc.size, 'joueur', 'joueurs') + ' dans l\'équipe.</p>';
-    h += renderCritPanel();
     STATS.forEach(function (s) { h += renderStatResult(s, r.calc[s]); });
+    h += renderCritPanel();
+    var floorTxt = (function () {
+      var ps = S.db.floors.pos || {}, parts = [];
+      ['GK', 'DEF', 'MID', 'FWD'].forEach(function (pp) { STATS.forEach(function (st) { var x = ps[pp] && ps[pp][st]; if (x) parts.push(POS_FR_S[pp] + ' ' + STAT_LABEL[st] + ' ' + fmt(x.value - 1)); }); });
+      return parts.length ? ' (' + parts.join(', ') + ')' : ' (importez un classement avec les postes pour l\'activer)';
+    })();
+    h += '<details class="card more"><summary>Règles utilisées</summary><p class="muted small">Défense : le joueur principal est un défenseur. Attaque : le joueur principal est un attaquant. Principal ' + fmt(rules.mainPct) + ' %, chaque autre carte ' + fmt(rules.supportPct) + ' %, ' +
+      ({ ceil: 'arrondi à l\'entier supérieur', round: 'arrondi à l\'entier le plus proche', floor: 'arrondi à l\'entier inférieur', none: 'sans arrondi' }[rules.rounding]) + ' pour chaque support. ' +
+      plural(r.calc.size, 'joueur', 'joueurs') + ' dans l\'équipe.</p><p class="muted small">Une note inconnue est remplacée par le 50e de son poste moins 1' + floorTxt + '.</p></details>';
     return h;
   }
 
   function renderStatResult(s, res) {
-    var L = STAT_LABEL[s];
+    var L = STAT_LABEL[s], name = (s === 'def' ? 'Défense' : 'Attaque') + (OPP ? ' de mon équipe' : ' adverse');
     if (res.none) {
-      return '<section class="card stat ' + s + '"><header class="shead"><h3>' + (s === 'def' ? 'Défense' : 'Attaque') + (OPP ? ' de mon équipe' : ' adverse') + '</h3><span class="big warn">—</span></header><p class="note warn">' +
+      return '<section class="card stat ' + s + '"><header class="shead"><h3>' + name + '</h3><span class="big warn">—</span></header><p class="note warn">' +
         (res.none === 'no-source' ? 'Aucun ' + (s === 'def' ? 'défenseur' : 'attaquant') + ' identifié dans l\'équipe (poste manquant ?) : ' + L + ' non calculable. Renseignez le poste dans la fiche du joueur.' : 'Cochez au moins un ' + (s === 'def' ? 'défenseur' : 'attaquant') + ' qui peut être le joueur principal.') + '</p></section>';
     }
     var cands = res.candidates.slice().sort(function (a, b) {
       if (a.mainMissing !== b.mainMissing) return a.mainMissing ? 1 : -1;
       return b.total - a.total;
     });
-    var h = '<section class="card stat ' + s + '"><header class="shead"><h3>' + (s === 'def' ? 'Défense' : 'Attaque') + (OPP ? ' de mon équipe' : ' adverse') + '</h3>';
-    var headline;
-    if (res.min == null) headline = '<span class="big warn">incomplet</span>';
-    else if (res.min === res.max) headline = '<span class="big">' + fmt(res.min) + '</span>';
-    else headline = '<span class="big">' + fmt(res.min) + ' <small>à</small> ' + fmt(res.max) + '</span>';
-    h += headline + '</header>';
+    var h = '<section class="card stat ' + s + '"><header class="shead"><h3>' + name + '</h3>';
+    if (res.min == null) h += '<span class="big warn">incomplet</span>';
+    else if (res.min === res.max) h += '<span class="big">' + fmt(res.min) + '</span>';
+    else h += '<span class="big">' + fmt(res.min) + ' <small>à</small> ' + fmt(res.max) + '</span>';
+    h += '</header><p class="muted small">' + (cands.length > 1 ? 'Deux cas possibles selon le joueur principal (sans critique).' : 'Un seul joueur principal possible (sans critique).') + '</p>';
+    var anyMissing = cands.some(function (c) { return !c.complete; });
+    if (anyMissing) {
+      var names = {};
+      cands.forEach(function (c) { c.missingNames.forEach(function (n) { names[n] = 1; }); });
+      h += '<p class="note warn small">Statistique ' + L + ' manquante pour : ' + Object.keys(names).map(esc).join(', ') + '. Les totaux marqués « au moins » ne comptent pas ces joueurs.</p>';
+    }
+    h += '<div class="cl">';
+    cands.forEach(function (c) {
+      var open = cands.length <= 2 ? ' open' : '';
+      var tot = c.mainMissing ? '<span class="tot warn">impossible</span>' : '<span class="tot">' + (c.complete ? '' : '<small>au moins </small>') + fmt(c.total) + '</span>';
+      h += '<details class="cand"' + open + '><summary><span>Principal : <b>' + esc(c.mainName) + '</b></span>' + tot + '</summary>';
+      if (c.mainMissing) h += '<p class="note warn small">' + esc(c.mainName) + ' n\'a pas de ' + L + ' connue : impossible de calculer ce cas.</p>';
+      h += '<div class="tw"><table class="calc"><thead><tr><th>Joueur</th><th>Calcul</th><th>Part</th></tr></thead><tbody>';
+      c.lines.forEach(function (l) {
+        var raw = l.base == null ? null : l.base * l.pct / 100;
+        var part = l.contrib == null ? '<span class="warn">manquante</span>' : '<b>' + fmt(l.contrib) + '</b>';
+        var calc = l.base == null ? '—' : '<span class="nw">' + fmt(l.base) + '\u00a0×\u00a0' + fmt(l.pct) + '\u00a0%</span>' + (l.skill ? '<small>' + (l.skill > 0 ? '+' : '−') + fmt(Math.abs(l.skill)) + ' compét.</small>' : '') + (raw != null && l.contrib != null && Math.abs(raw - l.contrib) > 1e-9 ? '<small>' + fmt(raw) + ' arrondi</small>' : '');
+        h += '<tr class="' + l.role + '"><td>' + esc(l.name) + '<small>' + (l.role === 'principal' ? 'principal' : 'support') + (l.est ? ' · note estimée (' + (l.estN != null && l.estN < 50 ? 'dernier ' : '50e ') + (POS_FR_S[l.estPos] || '') + ' − 1)' : '') + '</small></td><td>' + calc + '</td><td>' + part + '</td></tr>';
+      });
+      h += '</tbody><tfoot>';
+      h += '<tr class="base"><td colspan="2">Total de base (avant bonus)</td><td>' + fmt(c.subtotal) + '</td></tr>';
+      if (c.skills) h += '<tr class="bn"><td colspan="2">+ Compétences</td><td>' + (c.skills > 0 ? '+ ' : '− ') + fmt(Math.abs(c.skills)) + '</td></tr>';
+      if (c.bonus) h += '<tr class="bn"><td colspan="2">+ Bonus ' + L + '</td><td>+ ' + fmt(c.bonus) + '</td></tr>';
+      h += '<tr class="bn"><td colspan="2">+ Bonus de club</td><td>' + (c.club == null ? '<span class="muted">non confirmé</span>' : '+ ' + fmt(c.club)) + '</td></tr>';
+      h += '<tr class="total"><td colspan="2">Total ' + L + (c.complete ? '' : ' (minimum)') + '</td><td>' + fmt(c.total) + '</td></tr>';
+      if (c.critTotal != null) h += '<tr class="crit"><td colspan="2">Critiques, à part : si toutes critiquent, +' + fmt(c.crit) + '</td><td>' + fmt(c.critTotal) + '</td></tr>';
+      h += '</tfoot></table></div></details>';
+    });
+    h += '</div>';
     var cexp = cands.filter(function (c) { return c.dist && !c.mainMissing; });
     if (cexp.length) {
       var emin = Math.min.apply(null, cexp.map(function (c) { return c.expTotal; })), emax = Math.max.apply(null, cexp.map(function (c) { return c.expTotal; })), mx = Math.max.apply(null, cexp.map(function (c) { return c.maxTotal; }));
       if (mx > res.max + 1e-9) h += '<p class="muted small">Avec les critiques (aléatoires) : en moyenne ' + (Math.abs(emin - emax) < 0.05 ? fmt(Math.round(emin * 10) / 10) : fmt(Math.round(emin * 10) / 10) + ' à ' + fmt(Math.round(emax * 10) / 10)) + ', jusqu\'à ' + fmt(mx) + ' si toutes les cartes critiquent.</p>';
     }
-    var anyMissing = cands.some(function (c) { return !c.complete; });
-    if (anyMissing) {
-      var names = {};
-      cands.forEach(function (c) { c.missingNames.forEach(function (n) { names[n] = 1; }); });
-      h += '<p class="note warn">Statistique ' + L + ' manquante pour : ' + Object.keys(names).map(esc).join(', ') + '. Les totaux marqués « au moins » ne comptent pas ces joueurs.</p>';
-    }
-    h += '<div class="cl">';
-    cands.forEach(function (c, i) {
-      var open = i === 0 && cands.length <= 3 ? ' open' : '';
-      var tot = c.mainMissing ? '<span class="tot warn">impossible</span>' : '<span class="tot">' + (c.complete ? '' : '<small>au moins </small>') + fmt(c.total) + '</span>';
-      h += '<details class="cand"' + open + '><summary><span>Principal : <b>' + esc(c.mainName) + '</b></span>' + tot + '</summary>';
-      if (c.mainMissing) h += '<p class="note warn small">' + esc(c.mainName) + ' n\'a pas de ' + L + ' connue : impossible de calculer ce cas.</p>';
-      h += '<div class="tw"><table><thead><tr><th>Joueur</th><th>Base</th><th>Part</th></tr></thead><tbody>';
-      c.lines.forEach(function (l) {
-        var raw = l.base == null ? null : l.base * l.pct / 100;
-        var part = l.contrib == null ? '<span class="warn">manquante</span>' :
-          (Math.abs(raw - l.contrib) > 1e-9 ? fmt(raw) + ' → <b>' + fmt(l.contrib) + '</b>' : '<b>' + fmt(l.contrib) + '</b>');
-        h += '<tr class="' + l.role + '"><td>' + esc(l.name) + '<small>' + (l.role === 'principal' ? 'principal' : 'support') + ' · ' + fmt(l.pct) + '\u00a0%' + (l.est ? ' · estimé (50e − 1)' : '') + '</small></td><td>' + (l.base == null ? '—' : fmt(l.base)) + (l.skill ? '<small>' + (l.skill > 0 ? '+' : '−') + fmt(Math.abs(l.skill)) + ' compét.</small>' : '') + '</td><td>' + part + '</td></tr>';
-      });
-      h += '</tbody><tfoot>';
-      h += '<tr><td colspan="2">Sous-total</td><td>' + fmt(c.subtotal) + '</td></tr>';
-      if (c.skills) h += '<tr><td colspan="2">Compétences</td><td>' + (c.skills > 0 ? '+ ' : '− ') + fmt(Math.abs(c.skills)) + '</td></tr>';
-      h += '<tr><td colspan="2">Bonus ' + L + '</td><td>+ ' + fmt(c.bonus) + '</td></tr>';
-      h += '<tr><td colspan="2">Bonus de club</td><td>' + (c.club == null ? '<span class="muted">non confirmé, pas ajouté</span>' : '+ ' + fmt(c.club)) + '</td></tr>';
-      h += '<tr class="total"><td colspan="2">Total ' + L + (c.complete ? '' : ' (minimum)') + '</td><td>' + fmt(c.total) + '</td></tr>';
-      if (c.critTotal != null) h += '<tr class="crit"><td colspan="2">Si critique (aléatoire, à part) : +' + fmt(c.crit) + '</td><td>' + fmt(c.critTotal) + '</td></tr>';
-      h += '</tfoot></table></div></details>';
-    });
-    h += '</div></section>';
-    return h;
+    return h + '</section>';
   }
 
 
@@ -3952,6 +4031,364 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   }
 
   /* ---------- Rendu : Importer ---------- */
+  /* ---------- Vidéo de joueurs : lecture automatique d'une liste de cartes qui défile ---------- */
+  var VID_KEY = 'snatch.vid';
+  var VID_W = 900; /* largeur de la lecture plein cadre (le reste se lit sur des découpes en pleine résolution) */
+  function vidWords(cv) {
+    var k = Math.min(1, VID_W / cv.width), sc = document.createElement('canvas');
+    sc.width = Math.round(cv.width * k); sc.height = Math.round(cv.height * k);
+    var cx = sc.getContext('2d'); cx.imageSmoothingQuality = 'high'; cx.drawImage(cv, 0, 0, sc.width, sc.height);
+    return matchRead(sc, 11).then(function (ws) {
+      return ws.map(function (w) { return { t: String(w.text || ''), x0: w.bbox.x0 / k, y0: w.bbox.y0 / k, x1: w.bbox.x1 / k, y1: w.bbox.y1 / k }; });
+    });
+  }
+  /* En-têtes « DEF n | ATK n » : on repère les mots DEF / ATK (même mal lus : « EF », « TK ») et on regroupe ceux d'une même rangée et d'une même colonne. */
+  function vidHeaders(words, W, H) {
+    var anchors = [];
+    words.forEach(function (w) {
+      var t = w.t.replace(/[^A-Za-z0-9]/g, '').toUpperCase(), cxm = (w.x0 + w.x1) / 2, cy = (w.y0 + w.y1) / 2, hh = w.y1 - w.y0;
+      if (hh > 0.03 * H || hh < 0.004 * H) return; /* les en-têtes sont petits */
+      var col = cxm < 0.5 * W ? 0 : 1, x0 = (col ? 0.534 : 0.042) * W, cw = 0.424 * W;
+      if (/^(DEF|DE|EF|DF|OEF|DEE|DEFI)$/.test(t)) anchors.push({ col: col, y: cy, kind: 'label' });
+      else if (/^(ATK|TK|ATX|ATH|ATN|ATI|ATE|ATKI|AK)$/.test(t)) anchors.push({ col: col, y: cy, kind: 'label' });
+      else if (/^\d{1,3}$/.test(t)) {
+        if (Math.abs(cxm - (x0 + 0.34 * cw)) < 0.12 * cw) anchors.push({ col: col, y: cy, kind: 'ndef' });
+        else if (Math.abs(cxm - (x0 + 0.75 * cw)) < 0.12 * cw) anchors.push({ col: col, y: cy, kind: 'natk' });
+      }
+    });
+    var heads = [];
+    anchors.sort(function (a, b) { return a.y - b.y; });
+    anchors.forEach(function (a) {
+      var h = heads.filter(function (g) { return g.col === a.col && Math.abs(g.y - a.y) < 0.012 * H; })[0];
+      if (!h) { h = { col: a.col, ys: [], kinds: {} }; heads.push(h); }
+      h.ys.push(a.y); h.kinds[a.kind] = 1; h.y = h.ys.reduce(function (s, v) { return s + v; }, 0) / h.ys.length;
+    });
+    return heads.filter(function (h) { return (h.kinds.ndef && h.kinds.natk) || ((h.kinds.ndef || h.kinds.natk) && h.kinds.label) || (h.kinds.label && Object.keys(h.kinds).length === 1 && h.ys.length >= 2); });
+  }
+  function vidGeom(h, W) { var w = 0.424 * W; return { x0: (h.col ? 0.534 : 0.042) * W, w: w }; }
+  function vidCrop(cv, x0, y0, x1, y1, outH) {
+    x0 = Math.max(0, Math.round(x0)); y0 = Math.max(0, Math.round(y0)); x1 = Math.min(cv.width, Math.round(x1)); y1 = Math.min(cv.height, Math.round(y1));
+    if (x1 - x0 < 12 || y1 - y0 < 8) return null;
+    var sc = outH / (y1 - y0), pad = 14, w = Math.round((x1 - x0) * sc), c = document.createElement('canvas');
+    c.width = w + 2 * pad; c.height = outH + 2 * pad;
+    var cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height); cx.imageSmoothingQuality = 'high';
+    cx.drawImage(cv, x0, y0, x1 - x0, y1 - y0, pad, pad, w, outH);
+    return c;
+  }
+  function vidThresh(c, th) {
+    var o = document.createElement('canvas'); o.width = c.width; o.height = c.height;
+    var cx = o.getContext('2d'); cx.drawImage(c, 0, 0);
+    var im = cx.getImageData(0, 0, o.width, o.height), p = im.data, i, g;
+    for (i = 0; i < p.length; i += 4) { g = (p[i] * 299 + p[i + 1] * 587 + p[i + 2] * 114) / 1000; p[i] = p[i + 1] = p[i + 2] = g < th ? 0 : 255; p[i + 3] = 255; }
+    cx.putImageData(im, 0, 0); return o;
+  }
+  function vidOcr(c, psm, wl) {
+    if (!c) return Promise.resolve('');
+    return ocrWorker().then(function (w) {
+      return w.setParameters({ tessedit_pageseg_mode: String(psm), tessedit_char_whitelist: wl || '' }).then(function () { return w.recognize(c); });
+    }).then(function (r) { return String((r && r.data && r.data.text) || ''); });
+  }
+  function vidNum(t) {
+    var m = String(t).replace(/[^A-Z0-9 ]/gi, ' ').match(/(\d{1,3})\s*$/);
+    var v = m ? +m[1] : null;
+    return v != null && v >= 10 && v <= 150 ? v : null;
+  }
+  function vidResolveName(variants) {
+    var m = C.matchOcrName(S.db.players, variants), raw = C.cleanOcrName(m.text) || '', xm = null;
+    if (m.sure) return { name: m.best.name, strength: 2, raw: raw };
+    if (m.letters >= 4) { try { xm = C.matchExtraNames(EXTRA_NAMES, variants); } catch (e) { xm = null; } }
+    if (xm && xm.best && xm.best.score >= 0.9 && xm.margin >= 0.095 && (!m.best || xm.best.score >= m.best.score + 0.04)) return { name: xm.best.name, strength: 1, raw: raw };
+    if (m.best && ((m.best.score >= 0.65 && m.margin >= 0.12) || (m.best.score >= 0.82 && m.margin >= 0.07))) return { name: m.best.name, strength: 1, raw: raw };
+    return { name: null, strength: 0, raw: raw };
+  }
+  function vidKey(store, r) {
+    if (r.name) return 'n:' + C.nameKey(r.name);
+    var nk = C.normText(r.raw), best = null;
+    if (nk.replace(/ /g, '').length < 5) return null;
+    Object.keys(store.p).forEach(function (k) { if (k.charAt(0) === 'r' && C.sim(k.slice(2), nk) >= 0.86) best = k; });
+    return best || 'r:' + nk;
+  }
+  function vidVote(map, v, n) { if (v == null) return; map[v] = (map[v] || 0) + (n || 1); }
+  function vidTop(map) {
+    var ks = Object.keys(map).sort(function (a, b) { return map[b] - map[a]; });
+    return ks.length ? { v: ks[0], n: map[ks[0]], second: ks[1] ? map[ks[1]] : 0 } : null;
+  }
+  function vidDone(o) { var d = vidTop(o.v.def), a = vidTop(o.v.atk), p = vidTop(o.pos); return !!(d && d.n >= 2 && a && a.n >= 2 && p && p.n >= 1); }
+  /* Une carte de l'image : lit les deux notes, le nom et le poste */
+  function vidCard(cv, words, h, store) {
+    var W = cv.width, H = cv.height, g = vidGeom(h, W), w = g.w, x0 = g.x0, hy = h.y;
+    if (hy - 0.09 * w < 0 || hy + 1.40 * w > 0.94 * H) return Promise.resolve(null); /* carte coupée en haut ou en bas */
+    var nz = { y0: hy + 1.03 * w, y1: hy + 1.46 * w };
+    var lines = [];
+    words.forEach(function (q) {
+      var cx = (q.x0 + q.x1) / 2, cy = (q.y0 + q.y1) / 2;
+      if (cx < x0 || cx > x0 + w || cy < nz.y0 || cy > nz.y1) return;
+      if (!/[A-Za-zÀ-ɏ]{2,}/.test(q.t)) return;
+      var l = lines.filter(function (L) { return Math.abs(L.cy - cy) < 0.5 * (q.y1 - q.y0); })[0];
+      if (!l) { l = { cy: cy, ws: [] }; lines.push(l); }
+      l.ws.push(q);
+    });
+    lines.sort(function (a, b) { return a.cy - b.cy; });
+    var wfText = lines.map(function (L) { return L.ws.sort(function (a, b) { return a.x0 - b.x0; }).map(function (q) { return q.t; }).join(' '); }).join(' ');
+    var wfNums = words.filter(function (q) { var cy = (q.y0 + q.y1) / 2, cx = (q.x0 + q.x1) / 2; return /^\d{1,3}$/.test(q.t) && Math.abs(cy - hy) < 0.05 * w && cx > x0 && cx < x0 + w; }).sort(function (a, b) { return a.x0 - b.x0; });
+    var wf = { def: null, atk: null };
+    if (wfNums.length >= 2) { wf.def = vidNum(wfNums[0].t); wf.atk = vidNum(wfNums[wfNums.length - 1].t); }
+    else if (wfNums.length === 1) { var onLeft = (wfNums[0].x0 + wfNums[0].x1) / 2 < x0 + 0.5 * w; wf[onLeft ? 'def' : 'atk'] = vidNum(wfNums[0].t); }
+    var quick = wfText.replace(/[^A-Za-zÀ-ɏ' -]/g, ' ').trim().length >= 4 ? vidResolveName([wfText]) : { name: null, strength: 0, raw: '' };
+    if (quick.strength >= 2) {
+      var qo = store.p['n:' + C.nameKey(quick.name)];
+      if (qo && vidDone(qo)) { qo.n++; qo.strong++; return Promise.resolve({ name: quick.name, again: true }); }
+    }
+    /* carte déjà bien lue plus tôt dans la vidéo : mêmes deux notes et un bout de nom qui ressemble → inutile de tout relire */
+    if (wf.def != null && wf.atk != null && wfText) {
+      var wt = C.normText(wfText).split(' ').filter(function (x) { return x.length >= 3; }), hit = null;
+      Object.keys(store.p).forEach(function (k) {
+        var q = store.p[k]; if (!q.name || !vidDone(q)) return;
+        var qd = vidTop(q.v.def), qa = vidTop(q.v.atk); if (+qd.v !== wf.def || +qa.v !== wf.atk) return;
+        var qt = C.normText(q.name).split(' ');
+        if (wt.some(function (x) { return qt.some(function (y) { return C.sim(x, y) >= 0.75; }); })) hit = q;
+      });
+      if (hit) { hit.n++; return Promise.resolve({ name: hit.name, again: true }); }
+    }
+    var obs = { variants: wfText ? [wfText] : [], def: null, atk: null, pos: null }, c;
+    var chain = Promise.resolve();
+    function readStat(xa, xb, xna, xnb) {
+      return vidOcr(vidCrop(cv, x0 + xa * w, hy - 0.075 * w, x0 + xb * w, hy + 0.075 * w, 80), 7, 'DEFATK0123456789 ').then(function (t) {
+        var v = vidNum(t); if (v != null) return v;
+        /* seconde chance : on ne découpe que le chiffre, plus gros */
+        return vidOcr(vidCrop(cv, x0 + xna * w, hy - 0.08 * w, x0 + xnb * w, hy + 0.08 * w, 110), 7, '0123456789').then(vidNum);
+      });
+    }
+    chain = chain.then(function () { return readStat(0.04, 0.54, 0.20, 0.56); }).then(function (v) { obs.def = v; });
+    chain = chain.then(function () { return readStat(0.50, 0.99, 0.60, 0.99); }).then(function (v) { obs.atk = v; });
+    /* Le nom est écrit en blanc à contour noir sur la photo, sur une ou deux lignes : on lit chaque ligne à part, en plusieurs contrastes */
+    [[1.10, 1.225], [1.215, 1.34]].forEach(function (bd) {
+      var parts = [];
+      chain = chain.then(function () {
+        var c = vidCrop(cv, x0 + 0.08 * w, hy + bd[0] * w, x0 + 0.92 * w, hy + bd[1] * w, 110);
+        if (!c) return null;
+        var variants = [null, 80, 110], q = Promise.resolve();
+        variants.forEach(function (th) {
+          q = q.then(function () { return vidOcr(th ? vidThresh(c, th) : c, 7, ''); }).then(function (t) { t = t.replace(/[^A-Za-z\u00C0-\u024F' -]+/g, ' ').replace(/\s+/g, ' ').trim(); if (t.replace(/[^A-Za-z]/g, '').length >= 2) parts.push(t); });
+        });
+        return q;
+      }).then(function () { if (parts.length) obs.lines = (obs.lines || []).concat([parts]); });
+    });
+    chain = chain.then(function () {
+      var L = obs.lines || [];
+      /* lectures candidates : chaque ligne seule, et les lignes assemblées (même contraste) */
+      var i;
+      for (i = 0; i < 3; i++) {
+        var seq = L.map(function (p) { return p[Math.min(i, p.length - 1)]; }).filter(Boolean);
+        if (seq.length) obs.variants.push(seq.join(' '));
+      }
+      L.forEach(function (p) { p.forEach(function (t) { obs.variants.push(t); }); });
+    });
+    chain = chain.then(function () {
+      var r = vidResolveName(obs.variants);
+      obs.r = r;
+      var key = vidKey(store, r); obs.key = key;
+      if (!key) return null;
+      var o = store.p[key];
+      var dbp = r.name ? S.db.players[(C.matchOcrName(S.db.players, [r.name]).best || {}).id] : null;
+      if (dbp && dbp.pos && C.normText(dbp.name) !== C.normText(r.name)) dbp = null;
+      if ((o && o.pos && vidTop(o.pos) && vidTop(o.pos).n >= 2) || (dbp && dbp.pos)) return null;
+      return readCardTag(cv, { x0: x0, x1: x0 + w, top: hy + 1.43 * w }).catch(function () { return null; }).then(function (tag) { obs.pos = tag; });
+    });
+    return chain.then(function () {
+      var r = obs.r, key = obs.key; if (!key) return { name: null };
+      var o = store.p[key] = store.p[key] || { name: r.name, raw: r.raw, n: 0, strong: 0, v: { def: {}, atk: {} }, pos: {} };
+      o.n++; if (r.strength >= 2) o.strong++;
+      o.vars = (o.vars || []).concat(obs.variants).slice(-30);
+      if (r.name && !o.name) o.name = r.name;
+      vidVote(o.v.def, obs.def, 1); vidVote(o.v.atk, obs.atk, 1);
+      if (obs.def != null && obs.def === wf.def) vidVote(o.v.def, obs.def, 1);
+      if (obs.atk != null && obs.atk === wf.atk) vidVote(o.v.atk, obs.atk, 1);
+      if (obs.pos) vidVote(o.pos, obs.pos, 1);
+      return { name: r.name || r.raw, def: obs.def, atk: obs.atk, pos: obs.pos };
+    });
+  }
+  function vidFrame(cv, store) {
+    return vidWords(cv).then(function (words) {
+      var heads = vidHeaders(words, cv.width, cv.height), seen = 0, chain = Promise.resolve();
+      heads.forEach(function (h) { chain = chain.then(function () { return vidCard(cv, words, h, store); }).then(function (x) { if (x) seen++; }); });
+      return chain.then(function () { store.frames = (store.frames || 0) + 1; return { heads: heads.length, seen: seen }; });
+    });
+  }
+  function vidRows(store) {
+    var ents = Object.keys(store.p).map(function (k) { return store.p[k]; });
+    function statOf(o, s) { var t = vidTop(o.v[s]); return t && t.n >= 2 ? +t.v : null; }
+    function tokSim(x, y) {
+      var tx = C.normText(x).split(' ').filter(function (t) { return t.length >= 3; }), ty = C.normText(y).split(' ').filter(function (t) { return t.length >= 3; }), b = 0;
+      tx.forEach(function (p) { ty.forEach(function (q) { var s = C.simFlex ? C.simFlex(p, q) : C.sim(p, q); if (s > b) b = s; }); });
+      return b;
+    }
+    function textOf(o) { return (o.name ? o.name + ' ' : '') + (o.raw || '') + ' ' + (o.vars || []).join(' '); }
+    function compat(a, b) {
+      var d1 = statOf(a, 'def'), d2 = statOf(b, 'def'), a1 = statOf(a, 'atk'), a2 = statOf(b, 'atk');
+      if ((d1 != null && d2 != null && d1 !== d2) || (a1 != null && a2 != null && a1 !== a2)) return false;
+      return (d1 != null && d1 === d2) || (a1 != null && a1 === a2) || (d1 == null && a1 == null) || (d2 == null && a2 == null);
+    }
+    function absorb(into, o) {
+      into.n += o.n; into.strong += o.strong; into.vars = (into.vars || []).concat(o.vars || []).slice(-60);
+      ['def', 'atk'].forEach(function (s) { Object.keys(o.v[s]).forEach(function (v) { vidVote(into.v[s], v, o.v[s][v]); }); });
+      Object.keys(o.pos).forEach(function (v) { vidVote(into.pos, v, o.pos[v]); });
+      o.merged = true;
+    }
+    var anchored = ents.filter(function (o) { return o.name && (o.strong >= 1 || o.n >= 2); }), loose = ents.filter(function (o) { return anchored.indexOf(o) < 0; });
+    /* 1) lectures isolées d'un joueur déjà sûr : mêmes notes lues, nom proche → rattachées */
+    loose.forEach(function (o) {
+      var best = null, bs = 0, second = 0;
+      anchored.forEach(function (q) {
+        if (!compat(o, q) || (statOf(o, 'def') == null && statOf(o, 'atk') == null)) return;
+        var s = tokSim(textOf(o), q.name); if (s > bs) { second = bs; bs = s; best = q; } else if (s > second) second = s;
+      });
+      if (best && bs >= 0.6 && bs - second >= 0.06) absorb(best, o);
+    });
+    /* 2) lectures floues d'une même carte : on les regroupe (mêmes notes, mots qui se ressemblent), puis on cherche le nom sur l'ensemble des lectures */
+    var rest = loose.filter(function (o) { return !o.merged; }), groups = [];
+    rest.forEach(function (o) {
+      var g = groups.filter(function (G) { return G.some(function (q) { return compat(o, q) && (statOf(o, 'def') != null || statOf(o, 'atk') != null || statOf(q, 'def') != null || statOf(q, 'atk') != null) && tokSim(textOf(o), textOf(q)) >= 0.6; }); })[0];
+      if (g) g.push(o); else groups.push([o]);
+    });
+    var rows = [], lost = [];
+    function emit(o) {
+      var d = vidTop(o.v.def), a = vidTop(o.v.atk), p = vidTop(o.pos);
+      return { name: o.name || o.raw, def: d && d.n >= 2 ? +d.v : null, atk: a && a.n >= 2 ? +a.v : null, pos: p && p.n >= 1 && p.n > p.second ? p.v : null, unreadable: !(o.strong >= 1 || (o.name && o.n >= 2)) };
+    }
+    anchored.forEach(function (o) { rows.push(emit(o)); });
+    groups.forEach(function (G) {
+      var m = G[0];
+      G.slice(1).forEach(function (o) { absorb(m, o); });
+      if (G.length < 2 && m.n < 2) { var e0 = emit(m); lost.push({ raw: m.name || m.raw, def: e0.def, atk: e0.atk }); return; }
+      var r = vidResolveName((m.vars || []).slice(-40));
+      if (r.name && r.strength >= 1) { m.name = r.name; rows.push(emit(m)); }
+      else { var e1 = emit(m); lost.push({ raw: m.name || m.raw, def: e1.def, atk: e1.atk }); }
+    });
+    return { rows: rows, lost: lost };
+  }
+  /* Analyse du défilement : on ne lit que lorsque l'écran a vraiment bougé (réduit le travail, quelle que soit la durée) */
+  var VS_W = 40, VS_H = 128;
+  function vidSig(cv, c2) {
+    c2.width = VS_W; c2.height = VS_H;
+    var cx = c2.getContext('2d', { willReadFrequently: true }); cx.drawImage(cv, 0, 0, VS_W, VS_H);
+    var d = cx.getImageData(0, 0, VS_W, VS_H).data, g = new Float32Array(VS_W * VS_H), i;
+    for (i = 0; i < g.length; i++) g[i] = (d[i * 4] * 299 + d[i * 4 + 1] * 587 + d[i * 4 + 2] * 114) / 1000;
+    return g;
+  }
+  function vidSad(a, b, dy) {
+    var y0 = Math.round(0.14 * VS_H), y1 = Math.round(0.84 * VS_H), s = 0, n = 0, x, y;
+    for (y = y0; y < y1; y++) { var y2 = y + dy; if (y2 < 0 || y2 >= VS_H) continue; for (x = 0; x < VS_W; x++) { s += Math.abs(a[y * VS_W + x] - b[y2 * VS_W + x]); n++; } }
+    return n ? s / n : 255;
+  }
+  function vidShift(a, b) {
+    var s0 = vidSad(a, b, 0);
+    if (s0 < 2.2) return { still: true, dy: 0 };
+    var best = s0, by = 0, dy;
+    for (dy = -50; dy <= 50; dy++) { if (!dy) continue; var s = vidSad(a, b, dy); if (s < best) { best = s; by = dy; } }
+    return { still: false, dy: by, ok: by !== 0 && best < 0.75 * s0 && best < 18, s0: s0, best: best };
+  }
+  function vidSeek(v, t) {
+    return new Promise(function (res, rej) {
+      var done = false, to = setTimeout(function () { if (!done) { done = true; v.removeEventListener('seeked', ok); rej(new Error('seek')); } }, 12000);
+      function ok() { if (done) return; done = true; clearTimeout(to); v.removeEventListener('seeked', ok); res(); }
+      v.addEventListener('seeked', ok); v.currentTime = t;
+    });
+  }
+  function vidClock(sec) { sec = Math.max(0, Math.round(sec)); var h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60; return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + (s < 10 ? '0' : '') + s; }
+  function vidSaveState(fileKey, t, store) { try { localStorage.setItem(VID_KEY, JSON.stringify({ key: fileKey, t: t, store: store })); } catch (e) { /* ignore */ } }
+  function vidLoadState(fileKey) { try { var s = JSON.parse(localStorage.getItem(VID_KEY) || 'null'); return s && s.key === fileKey ? s : null; } catch (e) { return null; } }
+  function readVideo(file, job) {
+    var fileKey = file.name + '|' + file.size + '|' + (file.lastModified || 0);
+    var v = document.createElement('video'), url = URL.createObjectURL(file), sig = document.createElement('canvas'), full = document.createElement('canvas');
+    v.muted = true; v.playsInline = true; v.preload = 'auto'; v.setAttribute('playsinline', ''); v.src = url;
+    var store = { p: {}, frames: 0 }, t = 0, lock = null, t0 = Date.now(), nOcr = 0;
+    var prev = null, lastOcr = null, acc = 0, step = 0.5, dur = 0;
+    function cleanup() { try { URL.revokeObjectURL(url); } catch (e) { /* ignore */ } try { if (lock && lock.release) lock.release(); } catch (e) { /* ignore */ } v.removeAttribute('src'); try { v.load(); } catch (e) { /* ignore */ } }
+    function found() { return Object.keys(store.p).length; }
+    function progress() {
+      var el = (Date.now() - t0) / 1000, eta = t > 5 && el > 20 ? ' · reste environ ' + vidClock(el * (dur - t) / Math.max(1, t - (store.t0 || 0))) : '';
+      job.progress = 'Vidéo ' + vidClock(t) + ' sur ' + vidClock(dur) + ' · ' + plural(found(), 'joueur trouvé', 'joueurs trouvés') + eta + '. Gardez l\'écran allumé et l\'application ouverte.';
+      var e = document.querySelector('[data-job="' + job.id + '"] .busy span'); if (e) e.textContent = job.progress; else renderTab();
+    }
+    return new Promise(function (res, rej) {
+      v.onloadedmetadata = res; v.onerror = function () { rej(new Error('Cette vidéo ne peut pas être lue par ce navigateur (format ou codec non pris en charge).')); };
+      setTimeout(function () { rej(new Error('La vidéo met trop de temps à s\'ouvrir.')); }, 60000);
+    }).then(function () {
+      dur = v.duration;
+      if (!isFinite(dur) || dur <= 0) throw new Error('Durée de la vidéo illisible.');
+      try { if (navigator.wakeLock && navigator.wakeLock.request) navigator.wakeLock.request('screen').then(function (l) { lock = l; }, function () { /* ignore */ }); } catch (e) { /* ignore */ }
+      var st = vidLoadState(fileKey);
+      if (st && st.t > 1 && st.store) { store = st.store; t = st.t; job.notes.push('Reprise de la lecture à ' + vidClock(t) + ' (' + plural(found(), 'joueur déjà trouvé', 'joueurs déjà trouvés') + ').'); }
+      store.t0 = t;
+      var lastSave = Date.now();
+      function loop() {
+        if (job.ctl.signal.aborted || t >= dur - 0.05) return Promise.resolve();
+        return vidSeek(v, Math.min(t, dur - 0.05)).then(function () {
+          var W = v.videoWidth, H = v.videoHeight, k = Math.min(1, 2800 / Math.max(W, H));
+          full.width = Math.round(W * k); full.height = Math.round(H * k);
+          full.getContext('2d').drawImage(v, 0, 0, full.width, full.height);
+          var cur = vidSig(full, sig), doOcr = false, sh = null;
+          if (!prev) { doOcr = true; step = 0.4; }
+          else {
+            sh = vidShift(prev, cur);
+            if (sh.still) { if (acc > 0) { doOcr = true; } step = Math.min(step * 1.7, 2); }
+            else if (sh.ok) {
+              acc += Math.abs(sh.dy) / VS_H; if (acc >= 0.10) doOcr = true;
+              step = Math.max(0.08, Math.min(1, step * Math.max(0.5, Math.min(1.4, 0.06 / (Math.abs(sh.dy) / VS_H)))));
+            } else {
+              /* écran très différent (changement de page, défilement trop rapide) : on lit si l'image est nouvelle */
+              acc += 0.05; if (acc >= 0.10 || !lastOcr) doOcr = true; step = 0.25;
+            }
+          }
+          prev = cur;
+          var p = Promise.resolve();
+          if (doOcr) {
+            acc = 0; lastOcr = cur; nOcr++;
+            p = vidFrame(full, store);
+          }
+          return p.then(function () {
+            t += step; progress();
+            if (Date.now() - lastSave > 20000) { vidSaveState(fileKey, t, store); lastSave = Date.now(); }
+            return new Promise(function (r) { setTimeout(r, 0); });
+          });
+        }).then(loop);
+      }
+      return loop();
+    }).then(function () {
+      var done = !job.ctl.signal.aborted;
+      if (done) { try { localStorage.removeItem(VID_KEY); } catch (e) { /* ignore */ } } else vidSaveState(fileKey, t, store);
+      cleanup();
+      var out = vidRows(store);
+      job.vidLost = out.lost;
+      if (!done) job.notes.push('Lecture arrêtée à ' + vidClock(t) + ' sur ' + vidClock(dur) + '. Relancez la même vidéo pour reprendre là où vous vous êtes arrêté.');
+      job.notes.push(plural(nOcr, 'image analysée', 'images analysées') + ' sur ' + vidClock(dur) + ' de vidéo : ' + plural(out.rows.length, 'joueur reconnu', 'joueurs reconnus') + ', chacun une seule fois.');
+      if (out.lost.length) job.warnings.push(plural(out.lost.length, 'carte', 'cartes') + ' dont le nom n\'a pas pu être identifié sûrement (ignorée' + (out.lost.length > 1 ? 's' : '') + ', rien n\'est inventé) : ' + out.lost.slice(0, 8).map(function (x) { return '« ' + x.raw + ' »' + (x.def != null || x.atk != null ? ' (' + (x.def != null ? 'DEF ' + x.def : '') + (x.def != null && x.atk != null ? ', ' : '') + (x.atk != null ? 'ATK ' + x.atk : '') + ')' : ''); }).join(', ') + (out.lost.length > 8 ? '…' : '') + '.');
+      var nStat = out.rows.filter(function (r) { return r.def == null || r.atk == null; }).length;
+      if (nStat) job.warnings.push(plural(nStat, 'joueur', 'joueurs') + ' avec une note non lue de façon sûre : elle reste vide plutôt que devinée.');
+      job.warnings.push('Vidéo lue sur l\'appareil : seules les notes DEF/ATK, le poste et le nom sont pris en compte ; tout ce qui est incertain est laissé vide.');
+      return out.rows;
+    }, function (e) { cleanup(); throw e; });
+  }
+  function startVideoImport(file) {
+    var job = { id: uid(), name: file.name, kind: 'Vidéo', status: 'reading', rows: [], notes: [], warnings: [], err: '', mode: 'both', hint: null, noFloors: true,
+      decisions: {}, keepOld: {}, saved: null, ctl: new AbortController(), progress: 'Ouverture de la vidéo…' };
+    S.jobs.unshift(job); renderTab();
+    readVideo(file, job).then(function (rows) {
+      job.rows = rows || [];
+      if (!job.rows.length) { job.status = 'error'; job.err = 'Aucun joueur lisible dans cette vidéo. Il faut la liste des cartes (avec « DEF » et « ATK » au-dessus de chaque carte) bien visible à l\'écran.'; return; }
+      job.status = 'ready';
+      /* aucune valeur déjà enregistrée n'est écrasée par une lecture vidéo */
+      var rep = jobReport(job);
+      rep.conflicts.forEach(function (c) { job.keepOld[c.i + ':' + c.stat] = true; });
+      rep = jobReport(job);
+      if (!rep.toconfirm && !rep.conflicts.length) saveJob(job);
+      else job.warnings.push('Vérifiez les éléments « à confirmer » ci-dessous, puis enregistrez.');
+    }).catch(function (e) {
+      job.status = 'error'; job.err = e && e.message ? e.message : 'Lecture de la vidéo impossible.';
+    }).then(function () { renderTab(); });
+  }
+
   function renderImport() {
     var h = '<section class="hero"><h1>Importer des statistiques</h1>';
     h += '<p class="sub">Classements ou tableaux en CSV, Excel, PDF ou image. Un fichier peut ne contenir que la défense ou que l\'attaque : les joueurs sont complétés, jamais écrasés.</p>';
@@ -3962,6 +4399,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     h += '</div><p class="muted small">« Auto » repère DEF ou ATK d\'après les titres ou le nom du fichier. Si ce n\'est pas clair, l\'application vous le demande.</p>';
     h += '<label class="btn primary big" for="file-input">' + ICONS.import + '<span>Choisir des fichiers</span></label>';
     h += '<input id="file-input" type="file" multiple accept=".csv,.tsv,.txt,.xlsx,.xls,.xlsm,.ods,.pdf,image/*" hidden>';
+    if (LOCAL) h += '<label class="btn big" for="video-input">' + ICONS.import + '<span>Importer une vidéo de joueurs</span></label><input id="video-input" type="file" accept="video/*" hidden><p class="muted small">Enregistrez votre écran en faisant défiler la liste de cartes (avec « DEF » et « ATK » au-dessus de chaque carte). Chaque joueur n\'est enregistré qu\'une fois, quelle que soit la durée de la vidéo ; rien n\'est inventé.</p>';
     h += '</section>';
     h += '<details class="card more"><summary>Coller du texte</summary><label class="field"><span>Un joueur par ligne, par exemple « Paul Dupont 82 »</span><textarea id="paste-text" rows="5" placeholder="1. Paul Dupont   82"></textarea></label><button class="btn" data-act="paste-go">Lire ce texte</button></details>';
     if (S.jobs.length) h += '<h2 class="sec">En cours</h2>' + S.jobs.map(renderJob).join('');
@@ -4104,6 +4542,107 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
   applyTheme(getTheme());
 
   /* ---------- Rendu : Réglages ---------- */
+
+  /* ---------- Mot de passe (verrou sur l'appareil, gratuit, rien n'est envoyé nulle part) ---------- */
+  var LOCK_KEY = 'snatch.lock';
+  function lockGet() { try { return JSON.parse(localStorage.getItem(LOCK_KEY) || 'null'); } catch (e) { return null; } }
+  function lockUnlocked() { try { return sessionStorage.getItem('snatch.unlocked') === '1'; } catch (e) { return false; } }
+  function b64(buf) { var s = '', u = new Uint8Array(buf), i; for (i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); }
+  function unb64(s) { var b = atob(s), u = new Uint8Array(b.length), i; for (i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+  function lockHash(pw, saltB64) {
+    var enc = new TextEncoder();
+    return crypto.subtle.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveBits']).then(function (k) {
+      return crypto.subtle.deriveBits({ name: 'PBKDF2', salt: unb64(saltB64), iterations: 200000, hash: 'SHA-256' }, k, 256);
+    }).then(b64);
+  }
+  function lockSet(pw) {
+    var salt = b64(crypto.getRandomValues(new Uint8Array(16)));
+    return lockHash(pw, salt).then(function (h) { localStorage.setItem(LOCK_KEY, JSON.stringify({ salt: salt, hash: h })); });
+  }
+  function lockCheck(pw) {
+    var l = lockGet(); if (!l) return Promise.resolve(true);
+    return lockHash(pw, l.salt).then(function (h) { return h === l.hash; });
+  }
+  var lockFails = 0, lockUntil = 0;
+  function lockScreen() {
+    var l = lockGet();
+    if (!l || lockUnlocked()) { document.documentElement.classList.remove('locked'); var o = document.getElementById('lock'); if (o) o.remove(); return; }
+    document.documentElement.classList.add('locked');
+    var el = document.getElementById('lock');
+    if (!el) { el = document.createElement('div'); el.id = 'lock'; document.body.appendChild(el); }
+    el.innerHTML = '<div class="lockbox"><div class="lockicon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="9.5" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>' +
+      '<h1>Mon calculateur</h1><p class="muted">Entrez votre mot de passe.</p>' +
+      '<form id="lock-form" autocomplete="off"><input id="lock-pw" type="password" autocomplete="current-password" placeholder="Mot de passe" aria-label="Mot de passe"><button class="btn primary big" type="submit">Ouvrir</button></form>' +
+      '<p id="lock-msg" class="note bad small" hidden></p>' +
+      '<details class="more"><summary>Mot de passe oublié ?</summary><p class="muted small">Le mot de passe n\'est connu que de cet appareil : personne, moi compris, ne peut le retrouver. Vous pouvez seulement réinitialiser l\'application, ce qui <b>efface toutes les données de cet appareil</b> (joueurs, équipes, analyses). Si vous avez une sauvegarde, vous pourrez la restaurer ensuite.</p><button class="btn danger small" id="lock-reset" type="button">Réinitialiser l\'application…</button></details></div>';
+    var form = document.getElementById('lock-form'), msg = document.getElementById('lock-msg');
+    form.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var wait = lockUntil - Date.now();
+      if (wait > 0) { msg.hidden = false; msg.textContent = 'Trop d\'essais : patientez ' + Math.ceil(wait / 1000) + ' s.'; return; }
+      lockCheck(document.getElementById('lock-pw').value).then(function (ok) {
+        if (ok) { try { sessionStorage.setItem('snatch.unlocked', '1'); } catch (e) { /* ignore */ } lockFails = 0; lockScreen(); }
+        else { lockFails++; if (lockFails >= 5) lockUntil = Date.now() + Math.min(300, 5 * Math.pow(2, lockFails - 5)) * 1000; msg.hidden = false; msg.textContent = 'Mot de passe incorrect.'; document.getElementById('lock-pw').value = ''; }
+      });
+    });
+    document.getElementById('lock-reset').addEventListener('click', function () {
+      if (!window.confirm || true) {
+        var b = document.getElementById('lock-reset');
+        if (b.getAttribute('data-sure') !== '1') { b.setAttribute('data-sure', '1'); b.textContent = 'Oui, tout effacer et réinitialiser'; return; }
+        try { localStorage.clear(); sessionStorage.clear(); } catch (e) { /* ignore */ }
+        var done = function () { location.reload(); };
+        try { var rq = indexedDB.databases ? indexedDB.databases() : Promise.resolve([]); rq.then(function (dbs) { return Promise.all((dbs || []).map(function (d) { return new Promise(function (r) { var q = indexedDB.deleteDatabase(d.name); q.onsuccess = q.onerror = q.onblocked = r; }); })); }).then(done, done); } catch (e) { done(); }
+      }
+    });
+    setTimeout(function () { var i = document.getElementById('lock-pw'); if (i) i.focus(); }, 50);
+  }
+  function renderLockCard() {
+    var l = lockGet(), st = S.lockUi || '', h = '<section class="card"><h2 class="sec in">Mot de passe</h2>';
+    h += '<p class="muted small">' + (l ? 'L\'application demande votre mot de passe à chaque ouverture. Il reste sur cet appareil : personne ne peut le retrouver si vous l\'oubliez.' : 'Protégez l\'accès à l\'application avec un mot de passe de votre choix. Gratuit, il reste sur cet appareil.') + '</p>';
+    if (S.lockMsg) h += '<p class="note ' + (S.lockMsg.ok ? '' : 'bad') + ' small">' + esc(S.lockMsg.t) + '</p>';
+    function fld(id, label) { return '<label class="field"><span>' + label + '</span><input id="' + id + '" type="password" autocomplete="new-password"></label>'; }
+    if (!l) {
+      h += fld('lk-new', 'Nouveau mot de passe (4 caractères minimum)') + fld('lk-new2', 'Confirmer le mot de passe') + '<button class="btn primary" data-act="lock-save">Activer le mot de passe</button>';
+    } else if (st === 'change') {
+      h += fld('lk-cur', 'Mot de passe actuel') + fld('lk-new', 'Nouveau mot de passe') + fld('lk-new2', 'Confirmer le nouveau') + '<div class="row gap"><button class="btn primary" data-act="lock-change">Enregistrer</button><button class="btn ghost" data-act="lock-ui" data-v="">Annuler</button></div>';
+    } else if (st === 'remove') {
+      h += fld('lk-cur', 'Mot de passe actuel') + '<div class="row gap"><button class="btn danger" data-act="lock-remove">Retirer le mot de passe</button><button class="btn ghost" data-act="lock-ui" data-v="">Annuler</button></div>';
+    } else {
+      h += '<div class="row gap"><button class="btn" data-act="lock-ui" data-v="change">Modifier le mot de passe</button><button class="btn ghost" data-act="lock-ui" data-v="remove">Retirer</button><button class="btn ghost" data-act="lock-now">Verrouiller maintenant</button></div>';
+    }
+    return h + '</section>';
+  }
+  function lockAct(act, d) {
+    var g = function (id) { var e = document.getElementById(id); return e ? e.value : ''; };
+    function say(t, ok) { S.lockMsg = { t: t, ok: !!ok }; renderTab(); }
+    if (act === 'lock-ui') { S.lockUi = d.v || ''; S.lockMsg = null; renderTab(); return; }
+    if (act === 'lock-now') { try { sessionStorage.removeItem('snatch.unlocked'); } catch (e) { /* ignore */ } lockScreen(); return; }
+    if (act === 'lock-save') {
+      var n = g('lk-new'), n2 = g('lk-new2');
+      if (n.length < 4) return say('Le mot de passe doit faire au moins 4 caractères.');
+      if (n !== n2) return say('Les deux mots de passe ne sont pas identiques.');
+      lockSet(n).then(function () { try { sessionStorage.setItem('snatch.unlocked', '1'); } catch (e) { /* ignore */ } S.lockUi = ''; say('Mot de passe activé. Il sera demandé à chaque ouverture.', true); }).catch(function () { say('Impossible d\'enregistrer le mot de passe sur cet appareil.'); });
+      return;
+    }
+    if (act === 'lock-change') {
+      var cur = g('lk-cur'), n3 = g('lk-new'), n4 = g('lk-new2');
+      lockCheck(cur).then(function (ok) {
+        if (!ok) return say('Le mot de passe actuel est incorrect.');
+        if (n3.length < 4) return say('Le nouveau mot de passe doit faire au moins 4 caractères.');
+        if (n3 !== n4) return say('Les deux nouveaux mots de passe ne sont pas identiques.');
+        return lockSet(n3).then(function () { S.lockUi = ''; say('Mot de passe modifié.', true); });
+      });
+      return;
+    }
+    if (act === 'lock-remove') {
+      lockCheck(g('lk-cur')).then(function (ok) {
+        if (!ok) return say('Le mot de passe actuel est incorrect.');
+        try { localStorage.removeItem(LOCK_KEY); } catch (e) { /* ignore */ }
+        S.lockUi = ''; say('Mot de passe retiré.', true);
+      });
+    }
+  }
+
   function renderSettings() {
     var r = S.db.rules;
     var h = '<section class="hero"><h1>Réglages</h1><p class="sub">Les règles de calcul sont ici : changez-les si le jeu évolue avec les rebirths.</p></section>';
@@ -4118,6 +4657,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     h += '<label class="field"><span>Arrondi de chaque support</span><select id="r-round">' + [['ceil', 'À l\'entier supérieur (règle actuelle)'], ['round', 'À l\'entier le plus proche'], ['floor', 'À l\'entier inférieur'], ['none', 'Sans arrondi']].map(function (o) { return '<option value="' + o[0] + '"' + (r.rounding === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>';
     h += '<div class="row gap"><button class="btn primary" data-act="save-rules">Enregistrer la règle</button><button class="btn ghost" data-act="reset-rules">Remettre 100 % / 25 %</button></div>';
     h += '<p class="muted small">Le nombre de joueurs n\'est pas limité : tous les joueurs détectés sont comptés, avec la même règle.</p></section>';
+    h += renderLockCard();
     h += '<section class="card"><h2 class="sec in">Sauvegarde</h2><p class="muted small">' + (S.storage === 'db' ? (S.mode === 'local' ? 'Vos données sont enregistrées sur cet appareil, dans le stockage de l\'application : rien n\'est envoyé à un serveur. Faites une sauvegarde de temps en temps (ci-dessous) : si vous effacez les données du navigateur, elles disparaissent.' : S.mode === 'server' ? 'Vos données sont enregistrées dans la base du serveur : elles restent après fermeture et sur tous vos appareils.' : 'Vos données sont enregistrées dans l\'application et restent après fermeture.') : esc(S.note || 'Les données sont gardées seulement dans ce navigateur.')) + '</p>';
     h += '<div class="row gap"><button class="btn" data-act="export">Exporter la base (fichier)</button><label class="btn ghost" for="backup-input">Restaurer une sauvegarde</label><input id="backup-input" type="file" accept=".json,application/json" hidden></div></section>';
     if (S.mode === 'server') h += '<section class="card"><h2 class="sec in">Session</h2><a class="btn ghost" href="/logout">Se déconnecter</a></section>';
@@ -4168,7 +4708,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
       list = top.map(function (x) { return S.db.players[x.id]; });
       fuzzy = list.length > 0;
     }
-    if (!list.length) return '<p class="muted pad">Aucun joueur trouvé dans la base. S\'il n\'est dans aucun classement importé, ses notes sont estimées (50e − 1).</p>';
+    if (!list.length) return '<p class="muted pad">Aucun joueur trouvé dans la base. S\'il n\'est dans aucun classement importé, ses notes inconnues sont estimées avec le 50e de son poste − 1.</p>';
     return (fuzzy ? '<p class="muted small pad">Aucun nom exact : voici les plus proches.</p>' : '') + '<ul class="plist">' + list.slice(0, 40).map(function (p) {
       return '<li><button class="prow" data-act="pick-do" data-id="' + esc(p.id) + '"><span class="pn"><b>' + esc(p.name) + '</b><small>' + [p.pos, p.club].filter(Boolean).map(esc).join(' · ') + '</small></span><span class="chips tiny">' + playerChips(p) + '</span></button></li>';
     }).join('') + '</ul>' + (list.length > 40 ? '<p class="muted small pad">Affinez la recherche pour voir les autres.</p>' : '');
@@ -4303,6 +4843,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
         S.team = { state: 'idle', members: [], err: '', img: null, ctl: null };
         S.bonus = { def: '', atk: '', clubDef: '', clubAtk: '', critDef: '', critAtk: '' }; S.mainsOff = {}; S.confirmOpp = false;
         renderTab(); toast('Analyse supprimée'); break;
+      case 'lock-ui': case 'lock-now': case 'lock-save': case 'lock-change': case 'lock-remove': lockAct(act, d); break;
       case 'match-stop': if (M().ctl) M().ctl.abort(); break;
       case 'match-att': if (M().cur) { M().cur.att = +d.i; M().cur.attHow = 'manual'; matchRecord(); } renderTab(); break;
       case 'match-hist-clear': M().confirm = true; renderTab(); break;
@@ -4379,7 +4920,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
       case 'reset-ask': S.confirmReset = true; renderTab(); break;
       case 'reset-no': S.confirmReset = false; renderTab(); break;
       case 'reset-do':
-        S.db.players = {}; S.db.imports = []; S.db.floors = { def: null, atk: null }; S.confirmReset = false; S.team.members = [];
+        S.db.players = {}; S.db.imports = []; S.db.floors = { def: null, atk: null, pos: {} }; S.confirmReset = false; S.team.members = [];
         persist({ all: true, imports: true }).then(function () {
           if (dbh) { var seq = Promise.resolve(); for (var i = 0; i < CHUNKS; i++) (function (c) { seq = seq.then(function () { return dbh.doc('p/c' + (c < 10 ? '0' : '') + c).delete(); }); })(i); return seq; }
         }).catch(function () { /* ignore */ });
@@ -4433,6 +4974,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     else if (el.id === 'match-input' && el.files && el.files[0]) { analyseMatchShot(el.files[0]); el.value = ''; }
     else if (el.getAttribute && el.getAttribute('data-mf')) { matchEdit(el); }
     else if (el.id === 'mine-shot-input' && el.files && el.files[0]) { analyseScreenshot(el.files[0], false, true); el.value = ''; }
+    else if (el.id === 'video-input' && el.files && el.files[0]) { startVideoImport(el.files[0]); el.value = ''; }
     else if (el.id === 'file-input' && el.files && el.files.length) { startImport(Array.prototype.slice.call(el.files)); el.value = ''; }
     else if (el.id === 'backup-input' && el.files && el.files[0]) { restoreBackup(el.files[0]); el.value = ''; }
     else if (el.getAttribute('data-field') === 'main' && isMineEl(el)) {
@@ -4447,6 +4989,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
 
   /* ---------- Démarrage ---------- */
   function boot() {
+    lockScreen();
     document.addEventListener('click', onClick);
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') { clearTimeout(oppTimer); saveOpp(); } });
     window.addEventListener('pagehide', function () { clearTimeout(oppTimer); saveOpp(); });
@@ -4455,7 +4998,7 @@ tr.win td:last-child{color:var(--ok);font-weight:600}tr.lose td:last-child{color
     renderTab();
     initStorage().then(function () { return loadMine(); }).then(function () { return loadOpp(); }).then(function () { S.ready = true; renderTab(); }).catch(function () { S.ready = true; renderTab(); });
   }
-  window.SnatchApp = { fondThumb: fondThumb, fondFeatures: fondFeatures, fondPredict: fondPredict, readCardFond: readCardFond, nameCanvas: nameCanvas, ocrText: ocrText, readCardSkills: readCardSkills, skSlots: skSlots, findCardStrips: findCardStrips, findProfileCards: findProfileCards, findCardsByNames: findCardsByNames, completeGrid: completeGrid, tagCanvas: tagCanvas, bitmapCanvas: bitmapCanvas, S: S, C: C, startImport: startImport, saveJob: saveJob, jobReport: jobReport, renderTab: renderTab, analyseScreenshot: analyseScreenshot, teamCalc: teamCalc, effStats: effStats, boot: boot };
+  window.SnatchApp = { readCardTag: readCardTag, vidCrop: vidCrop, vidGeom: vidGeom, vidFrame: vidFrame, vidRows: vidRows, vidHeaders: vidHeaders, vidWords: vidWords, startVideoImport: startVideoImport, fondThumb: fondThumb, fondFeatures: fondFeatures, fondPredict: fondPredict, readCardFond: readCardFond, nameCanvas: nameCanvas, ocrText: ocrText, readCardSkills: readCardSkills, skSlots: skSlots, findCardStrips: findCardStrips, findProfileCards: findProfileCards, findCardsByNames: findCardsByNames, completeGrid: completeGrid, tagCanvas: tagCanvas, bitmapCanvas: bitmapCanvas, S: S, C: C, startImport: startImport, saveJob: saveJob, jobReport: jobReport, renderTab: renderTab, analyseScreenshot: analyseScreenshot, teamCalc: teamCalc, effStats: effStats, boot: boot };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
 
