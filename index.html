@@ -554,6 +554,11 @@ body { background-image: none; }
 .tabbar { border-top-width: 1px; }
 .tabbar button.on { color: var(--ink); background: var(--accent-soft); }
 .sheet { border-top: 1px solid var(--line); }
+.cmpside { display: flex; flex-direction: column; gap: 8px; padding-block: 12px; border-top: 1px solid var(--line); }
+.cmpside:first-of-type { border-top: 0; }
+.cmpsup { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.cmpsup li { display: flex; justify-content: space-between; gap: 8px; }
+.small.ok { color: var(--ok); }
 
 </style></head><body>
 <header class="top"><div class="brand">Mon <span>calculateur</span></div><div id="status" class="status" role="status"></div><button class="gear" data-tab="settings" aria-label="Réglages"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h9m4 0h1M5 17h3m4 0h7M5 12h1m4 0h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button></header>
@@ -1968,7 +1973,7 @@ body { background-image: none; }
   /* ----- Mode serveur (application hors de Claude) : base et lecture d'images passent par le serveur ----- */
   var SERVER = !!window.SNATCH_SERVER;
   /* Mode « local » : tout reste sur l'appareil (base IndexedDB), lecture des images par OCR gratuit sur l'appareil. Aucun serveur, aucune API payante. */
-  var BUILD = '07/10 02:51';
+  var BUILD = '07/10 10:58';
   /* Blocs repliables (Nouveautés, exemple de capture) : le choix est gardé sur l'appareil */
   function uiGet(key, def) {
     try { var o = JSON.parse(localStorage.getItem('snatch.ui') || '{}'); if (o && typeof o[key] === 'boolean') return o[key]; } catch (e) { /* ignore */ }
@@ -2009,6 +2014,8 @@ body { background-image: none; }
   /* Historique des mises à jour (affiché dans Réglages) : une ligne simple par amélioration, la plus récente en premier.
      À compléter à chaque nouvelle version. */
   var NEWS = [
+    { when: '7 octobre', title: 'Raretés retirées', text: 'Une seule fiche par joueur, comme avant : l\'application ne lit plus la rareté (Legendary, GOAT…) dans les PDF, les captures ou les fiches de carte. Les fiches qu\'elle avait séparées par rareté sont regroupées automatiquement (la plus récente est gardée, les autres notes restent dans l\'historique du joueur).' },
+    { when: '7 octobre', title: 'Analyse : comparaison avec le calcul', text: 'Envoyez la capture de fin de duel dans Analyse : l\'application compare ligne par ligne ce que le jeu a compté (joueur principal, soutiens, bonus Club) avec son propre calcul, montre l\'écart et propose de corriger la note, le bonus Club ou l\'arrondi en un toucher.' },
     { when: '7 octobre', title: 'Look épuré et plus rapide', text: 'Les fonds animés sont retirés (ils ralentissaient l\'iPhone au point de bloquer les boutons). Nouveau thème Noir épuré par défaut, en-tête simplifié ; Blanc et Auto restent dans Réglages → Thème. L\'écran d\'entrée garde son animation.' },
     { when: '7 octobre', title: 'Face ID et entrée animée', text: 'Réglages → Mot de passe : « Activer Face ID » ouvre l\'application avec Face ID, le mot de passe reste en secours. L\'écran d\'entrée a un fond animé.' },
     { when: '7 octobre', title: 'Attacker et Defender : +10 % de critique', text: 'Les compétences Attacker (+1 ATK) et Defender (+1 DEF) ajoutent maintenant aussi +10 % de chance de critique, comme dans le jeu.' },
@@ -2406,7 +2413,7 @@ body { background-image: none; }
           seq = seq.then(function () { return pdf.getPage(pn); }).then(function (pg) {
             return pg.getTextContent().then(function (tc) {
               texts.push(C.pdfItemsToText(tc.items));
-              return pdfIcons(pg, tc).then(function (l) { icons = icons.concat(l); }).catch(function () { /* icônes illisibles : la rareté se choisira à la main */ });
+              return null; /* raretés retirées : les icônes ne sont plus lues */
             });
           });
         })(n);
@@ -2420,7 +2427,7 @@ body { background-image: none; }
           var rc = {}, unsureR = 0;
           parsed.rows.forEach(function (r) {
             var q = byName[r.name];
-            if (q && q.length) { var ic = q.shift(); if (ic.rar) { r.rar = ic.rar; rc[ic.rar] = (rc[ic.rar] || 0) + 1; if (!ic.sure) unsureR++; } }
+            if (false && q && q.length) { var ic = q.shift(); if (ic.rar) { r.rar = ic.rar; rc[ic.rar] = (rc[ic.rar] || 0) + 1; if (!ic.sure) unsureR++; } }
           });
           var nr = Object.keys(rc).reduce(function (a, k) { return a + rc[k]; }, 0);
           if (nr) job.notes.push('Rareté lue sur les icônes : ' + C.RARITIES.filter(function (r) { return rc[r.key]; }).map(function (r) { return rc[r.key] + ' ' + r.name; }).join(', ') + (nr < parsed.rows.length ? ' (' + (parsed.rows.length - nr) + ' non lues)' : '') + '.');
@@ -2486,8 +2493,8 @@ body { background-image: none; }
           var miss = sheetMissing(sh);
           if (!sh.name) { job.warnings.push('Le nom de la carte est illisible : réessayez avec une capture plus nette, ou ajoutez le joueur à la main.'); return []; }
           if (miss.length) job.warnings.push('À compléter ou vérifier : ' + miss.join(', ') + '. Les valeurs non lues restent vides.');
-          job.notes.push('Page « Carte » lue : ' + sh.name + (sh.rar ? ' · ' + C.rarName(sh.rar) : '') + (sh.def != null ? ' · DEF ' + sh.def : '') + (sh.atk != null ? ' · ATK ' + sh.atk : '') + (sh.pos ? ' · ' + sh.pos : '') + '.');
-          var row = { name: sh.name, def: sh.def, atk: sh.atk, pos: sh.pos || null, club: null, rar: sh.rar || null };
+          job.notes.push('Page « Carte » lue : ' + sh.name + (sh.def != null ? ' · DEF ' + sh.def : '') + (sh.atk != null ? ' · ATK ' + sh.atk : '') + (sh.pos ? ' · ' + sh.pos : '') + '.');
+          var row = { name: sh.name, def: sh.def, atk: sh.atk, pos: sh.pos || null, club: null };
           if (!sh.nameSure) row.unreadable = true;
           return [row];
         }).then(function (rows) {
@@ -2532,7 +2539,7 @@ body { background-image: none; }
       renderTab();
       readJob(job, file).then(function (rows) {
         job.rows = rows || [];
-        if (!job.rows.some(function (r) { return r.rar; })) { var fk = C.rarKey(String(file.name || '').replace(/\.[^.]+$/, '').replace(/[_\-.]+/g, ' ')); if (fk) job.rar = fk; }
+        if (false) { var fk = C.rarKey(String(file.name || '').replace(/\.[^.]+$/, '').replace(/[_\-.]+/g, ' ')); if (fk) job.rar = fk; }
         if (!job.rows.length) { job.status = 'error'; job.err = 'Aucun joueur lisible dans ce fichier.'; }
         else job.status = 'ready';
       }).catch(function (e) {
@@ -2544,8 +2551,8 @@ body { background-image: none; }
 
   /* rareté d'un fichier : lue dans le fichier (icônes, colonne), ou imposée par l'utilisateur pour tout le fichier */
   function jobRows(job) {
-    if (!job.rar) return job.rows;
-    return job.rows.map(function (r) { var q = {}; Object.keys(r).forEach(function (k) { q[k] = r[k]; }); q.rar = job.rar; return q; });
+    /* raretés retirées : aucune ligne importée ne porte de rareté */
+    return job.rows.map(function (r) { if (!('rar' in r)) return r; var q = {}; Object.keys(r).forEach(function (k) { if (k !== 'rar') q[k] = r[k]; }); return q; });
   }
   function jobReport(job) {
     return C.applyImport(S.db.players, jobRows(job), job.decisions, job.keepOld, { file: job.name, chunks: CHUNKS });
@@ -3276,7 +3283,7 @@ body { background-image: none; }
     return chain.then(function () { return best || { name: '', sure: false }; });
   }
   function sheetSave(sh) {
-    var row = { name: sh.name, def: sh.def, atk: sh.atk, pos: sh.pos || null, rar: sh.rar || null };
+    var row = { name: sh.name, def: sh.def, atk: sh.atk, pos: sh.pos || null };
     var rep = C.applyImport(S.db.players, [row], {}, {}, { file: 'fiche de carte (capture)', chunks: CHUNKS });
     var it = rep.items[0];
     if (it.result === 'toconfirm') { var top = it.candidates[0]; rep = C.applyImport(S.db.players, [row], { 0: top && top.score >= 0.95 ? top.id : 'new' }, {}, { file: 'fiche de carte (capture)', chunks: CHUNKS }); it = rep.items[0]; }
@@ -3294,7 +3301,7 @@ body { background-image: none; }
     if (!sh) return '';
     var h = '<section class="card sheetcard"><header class="jh"><div><b>Fiche de carte lue</b><small>Notes vues sur la carte, pas dans un fichier</small></div><button class="x" data-act="sheet-close" aria-label="Fermer">×</button></header>';
     if (sh.saved) {
-      var p = S.db.players[sh.saved.id], what = { created: 'ajouté à la base (nouvelle fiche de cette rareté)', completed: 'fiche complétée', updated: 'notes mises à jour', unchanged: 'déjà dans la base avec ces notes' }[sh.saved.result] || 'enregistré';
+      var p = S.db.players[sh.saved.id], what = { created: 'ajouté à la base', completed: 'fiche complétée', updated: 'notes mises à jour', unchanged: 'déjà dans la base avec ces notes' }[sh.saved.result] || 'enregistré';
       h += '<p class="note ok"><b>' + esc(p ? p.name : sh.name) + '</b>' + rarBadge(p && p.rar) + ' · ' + STATS.map(function (s) { return STAT_LABEL[s] + ' <b>' + fmt(p ? p[s] : sh[s]) + '</b>'; }).join(' · ') + (p && p.pos ? ' · ' + esc(p.pos) : '') + ' — ' + what + '.</p>';
       (sh.saved.changes || []).filter(function (c) { return c.kind === 'changed'; }).forEach(function (c) { h += '<p class="muted small">' + STAT_LABEL[c.stat] + ' : ' + fmt(c.old) + ' → ' + fmt(c.now) + '</p>'; });
       h += '<div class="row gap"><button class="btn small" data-act="edit-player" data-id="' + esc(sh.saved.id) + '">Modifier la fiche</button><button class="btn small ghost" data-act="sheet-close">Fermer</button></div></section>';
@@ -3302,7 +3309,6 @@ body { background-image: none; }
     }
     h += '<p class="note warn small">' + esc(sh.why || 'Vérifiez ce qui a été lu, puis enregistrez.') + '</p>';
     h += '<label class="field"><span>Nom du joueur</span><input id="sh-name" type="text" value="' + esc(sh.name || '') + '" autocomplete="off"></label>';
-    h += '<div class="lbl">Rareté de la carte</div><div class="mactions rarrow">' + C.RARITIES.map(function (r) { return '<button class="btn small' + (sh.rar === r.key ? '' : ' ghost') + '" data-act="sheet-rar" data-rar="' + r.key + '"><i class="rdot r-' + r.key + '"></i>' + r.name + '</button>'; }).join('') + '</div>';
     h += '<div class="grid2"><label class="field"><span>DEF</span><input id="sh-def" type="text" inputmode="decimal" value="' + (sh.def == null ? '' : esc(sh.def)) + '"></label><label class="field"><span>ATK</span><input id="sh-atk" type="text" inputmode="decimal" value="' + (sh.atk == null ? '' : esc(sh.atk)) + '"></label></div>';
     h += '<label class="field"><span>Poste</span><select id="sh-pos"><option value="">Inconnu</option>' + [['GK', 'Gardien'], ['DEF', 'Défenseur'], ['MID', 'Milieu'], ['FWD', 'Attaquant']].map(function (o) { return '<option value="' + o[0] + '"' + (sh.pos === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>';
     h += '<div class="row gap"><button class="btn primary" data-act="sheet-save">Enregistrer dans la base</button><button class="btn ghost" data-act="sheet-close">Annuler</button></div></section>';
@@ -3322,7 +3328,7 @@ body { background-image: none; }
   function sheetMissing(p) {
     var miss = [];
     if (!p.name) miss.push('le nom'); else if (!p.nameSure) miss.push('le nom (à vérifier)');
-    if (!p.rar) miss.push('la rareté'); if (p.def == null) miss.push('la défense'); if (p.atk == null) miss.push('l\'attaque'); if (!p.pos) miss.push('le poste');
+    if (p.def == null) miss.push('la défense'); if (p.atk == null) miss.push('l\'attaque'); if (!p.pos) miss.push('le poste');
     return miss;
   }
   function sheetCheck(file) {
@@ -3410,7 +3416,7 @@ body { background-image: none; }
             // poste : celui de la base s'il est connu, sinon l'étiquette lue sur la carte
             var dbp = m.sure ? S.db.players[m.best.id] : null;
             var fd = null; try { fd = readCardFond(cv, card); } catch (e) { fd = null; }
-            var rr0 = null; try { rr0 = readCardRar(cv, card); } catch (e) { rr0 = null; }
+            var rr0 = null; /* raretés retirées */
             var crop = cardCrop(cv, card);
             return readCardSkills(cv, card).catch(function () { return []; }).then(function (sk) {
               if (dbp && dbp.pos) { rows.push(row); srcs.push(null); sks.push(sk); fds.push(fd); rrs.push(rr0); crops.push(crop); return null; }
@@ -3446,8 +3452,8 @@ body { background-image: none; }
         var rr = T.rrs && T.rrs[i];
         if (rr && rr.key) { m.rar = rr.key; m.rarAuto = true; rarRead++; if (!rr.sure) rarUnsure.push(m.name); }
       });
-      if (rarRead) notes.push('La rareté de chaque carte est lue sur son cadre (' + plural(rarRead, 'carte', 'cartes') + ' sur ' + T.members.length + ') : elle décide quelle note de la base est utilisée. Vérifiez-la, vous pouvez la corriger sur chaque carte.' + (rarUnsure.length ? ' Lecture incertaine (Star, Pro ou Common) : ' + rarUnsure.join(', ') + '.' : ''));
-      if (rarRead < T.members.length) notes.push('Rareté non lue sur ' + plural(T.members.length - rarRead, 'carte', 'cartes') + ' : choisissez-la à la main sur la carte.');
+      if (false) notes.push('La rareté de chaque carte est lue sur son cadre (' + plural(rarRead, 'carte', 'cartes') + ' sur ' + T.members.length + ') : elle décide quelle note de la base est utilisée. Vérifiez-la, vous pouvez la corriger sur chaque carte.' + (rarUnsure.length ? ' Lecture incertaine (Star, Pro ou Common) : ' + rarUnsure.join(', ') + '.' : ''));
+      if (false) notes.push('Rareté non lue sur ' + plural(T.members.length - rarRead, 'carte', 'cartes') + ' : choisissez-la à la main sur la carte.');
       var skUnsure = 0;
       T.members.forEach(function (m, i) {
         var sk = (T.sks && T.sks[i]) || [];
@@ -3520,7 +3526,6 @@ body { background-image: none; }
     var out = {};
     Object.keys(S.db.players).forEach(function (id) {
       var p = S.db.players[id], pos = C.normPos(p.pos);
-      if (rar && p.rar && p.rar !== rar) return; /* on compare des cartes de même rareté (les fiches sans rareté comptent aussi) */
       if (pos !== 'GK' && pos !== 'DEF' && pos !== 'MID' && pos !== 'FWD') return;
       STATS.forEach(function (s) {
         if (p[s] == null) return;
@@ -3533,15 +3538,15 @@ body { background-image: none; }
   function floorFor(m, p, s) {
     var pos = C.normPos((p && p.pos) || m.pos);
     if (pos !== 'GK' && pos !== 'DEF' && pos !== 'MID' && pos !== 'FWD') return null;
-    var w = worstByPos(m.rar || null), hit = w[pos] && w[pos][s];
-    return hit ? { value: hit.value, pos: pos, n: hit.n, who: hit.name, id: hit.id, rar: m.rar || null } : null;
+    var w = worstByPos(null), hit = w[pos] && w[pos][s];
+    return hit ? { value: hit.value, pos: pos, n: hit.n, who: hit.name, id: hit.id, rar: null } : null;
   }
   /* Fiche du joueur selon la rareté de la carte : une fiche par rareté (Legendary, GOAT, Star, Pro, Common).
      p0 = identité (nom, poste, club) ; p = fiche dont on prend les notes (null si la base n'a pas cette rareté) ; others = fiches d'autres raretés */
   function memberRec(m) {
     var p0 = m.id ? S.db.players[m.id] : null;
     if (!p0) return { p0: null, p: null, how: 'none', others: [] };
-    if (!m.rar) return { p0: p0, p: p0, how: 'any', others: [] };
+    return { p0: p0, p: p0, how: 'any', others: [] }; /* raretés retirées : une seule fiche par joueur */
     var ids = C.sibsOf(S.db.players, m.id), cs = C.chooseSibling(S.db.players, ids, m.rar);
     if (cs.how === 'other') return { p0: p0, p: null, how: 'other', others: ids.map(function (i) { return S.db.players[i]; }) };
     return { p0: p0, p: S.db.players[cs.id], how: cs.how, others: [] };
@@ -3562,13 +3567,14 @@ body { background-image: none; }
     return out;
   }
 
-  function teamCalc() {
+  function teamCalc(force) {
     var members = S.team.members.map(function (m) {
       var e = effStats(m), p = m.id ? S.db.players[m.id] : null;
       return { critP: (function () { var mu = C.MUTATIONS.filter(function (k) { return k.key === m.fond; })[0]; return ((mu ? mu.crit : 0) + C.skillCrit(m.skills)) / 100; })(), skills: m.skills || null, name: p ? p.name : m.name, pos: (p && p.pos) || m.pos || null, def: e.def, atk: e.atk, defEst: e.src.def === 'estimé', atkEst: e.src.atk === 'estimé', estInfo: e.estInfo || null };
     });
     var mains = [];
     S.team.members.forEach(function (m, i) { if (!S.mainsOff[m.key]) mains.push(i); });
+    if (force) mains = force;
     if (!members.length) return null;
     var b = S.bonus;
     return {
@@ -3786,6 +3792,86 @@ body { background-image: none; }
     h += renderMatchHist();
     return h;
   }
+
+  /* ---------- Analyse : comparaison entre le résultat du jeu et le calcul de l'application ---------- */
+  function cmpNameKey(n) { return C.normText ? C.normText(n || '') : String(n || '').toLowerCase(); }
+  function cmpFind(ocrName) {
+    if (!ocrName) return null;
+    var want = cmpNameKey(ocrName), best = null;
+    [['mine', S.mine.team.members], ['opp', S.team.members]].forEach(function (pair) {
+      (pair[1] || []).forEach(function (m, i) {
+        var p = m.id ? S.db.players[m.id] : null, nm = p ? p.name : m.name, k = cmpNameKey(nm);
+        if (!k) return;
+        var sc = k === want ? 1 : C.sim(k, want);
+        var last = k.split(' ').pop(), wl = want.split(' ').pop();
+        if (last && last.length > 3 && last === wl) sc = Math.max(sc, .9);
+        if (sc >= .78 && (!best || sc > best.sc)) best = { ctx: pair[0], idx: i, sc: sc, name: nm };
+      });
+    });
+    return best;
+  }
+  function cmpSide(cur, i, stat) {
+    var s = cur.sides[i], f = cmpFind(cur.names[i]);
+    var out = { i: i, stat: stat, game: s.rows, nsGame: s.counts ? s.counts.support : null, find: f, who: s.name || (i === 0 ? 'Gauche' : 'Droite') };
+    if (!f) return out;
+    var tc = f.ctx === 'mine' ? inMine(function () { return teamCalc([f.idx]); }) : teamCalc([f.idx]);
+    var r = tc && tc.calc ? tc.calc[stat] : null, cand = r && r.candidates.length ? r.candidates[0] : null;
+    if (!cand) { out.noCand = true; return out; }
+    var mainL = cand.lines.filter(function (l) { return l.role === 'principal'; })[0], sups = cand.lines.filter(function (l) { return l.role === 'support'; });
+    out.cand = cand; out.mainL = mainL; out.sups = sups;
+    out.app = { main: mainL.contrib, support: sups.some(function (l) { return l.contrib == null; }) ? null : sups.reduce(function (a, l) { return a + l.contrib; }, 0), club: cand.club };
+    var rules = S.db.rules || C.DEFAULT_RULES;
+    out.modes = {};
+    if (out.app.support != null) ['ceil', 'round', 'floor'].forEach(function (md) { out.modes[md] = sups.reduce(function (a, l) { return a + C.contribution(l.base, rules.supportPct, md); }, 0); });
+    return out;
+  }
+  function renderMatchCompare(cur) {
+    var att = cur.att == null ? 0 : cur.att, defI = 1 - att;
+    var sides = [cmpSide(cur, att, 'atk'), cmpSide(cur, defI, 'def')];
+    if (!sides.some(function (x) { return x.find; })) {
+      return '<section class="card"><b class="mt">Comparaison avec mon calcul</b><p class="muted small">Je ne retrouve aucun des deux joueurs principaux (' + esc(cur.names.filter(Boolean).join(', ') || 'noms non lus') + ') dans « Mon équipe » ni dans « Adversaire ». Pour comparer, gardez les deux équipes de ce duel dans l\'application avant d\'envoyer la capture du résultat.</p></section>';
+    }
+    var RL = { ceil: 'à l\'entier supérieur', round: 'à l\'entier le plus proche', floor: 'à l\'entier inférieur' };
+    var h = '<section class="card cmp"><b class="mt">Comparaison avec mon calcul</b><p class="muted small">Ce que le jeu a compté, sans les critiques, face à ce que l\'application avait calculé avec le même joueur principal.</p>';
+    sides.forEach(function (x) {
+      var lab = (x.stat === 'atk' ? 'Attaque' : 'Défense') + ' · ' + esc(x.who);
+      h += '<div class="cmpside"><span class="role">' + lab + '</span>';
+      if (!x.find) { h += '<p class="small muted">Joueur principal « ' + esc(cur.names[x.i] || '?') + ' » introuvable dans vos deux équipes.</p></div>'; return; }
+      var team = x.find.ctx === 'mine' ? 'Mon équipe' : 'Adversaire';
+      if (x.noCand) { h += '<p class="small muted">' + esc(x.find.name) + ' (' + team + ') ne peut pas être joueur principal en ' + (x.stat === 'atk' ? 'attaque' : 'défense') + ' dans l\'application : vérifiez son poste.</p></div>'; return; }
+      var g = x.game, a = x.app, rows = [['Joueur principal', g.main, a.main], ['Soutiens', g.support, a.support], ['Bonus Club', g.club, a.club]];
+      var gT = rows.reduce(function (t, r) { return r[1] == null || t == null ? null : t + r[1]; }, 0), aT = rows.reduce(function (t, r) { return t == null ? null : t + (r[2] == null ? 0 : r[2]); }, 0);
+      rows.push(['Total sans critiques', gT, aT]);
+      h += '<p class="small">Principal : <b>' + esc(x.find.name) + '</b> · équipe « ' + team + ' »</p><div class="mtab cmptab"><div class="mrow mhead"><span></span><span>Jeu</span><span>Appli</span><span>Écart</span></div>';
+      rows.forEach(function (r, k) {
+        var d = r[1] != null && r[2] != null ? r[2] - r[1] : null;
+        h += '<div class="mrow' + (k === 3 ? ' mtotal' : '') + '"><span>' + r[0] + '</span><span>' + (r[1] != null ? r[1] : '?') + '</span><span>' + (r[2] != null ? r[2] : (k === 2 ? 'vide' : '?')) + '</span><span class="' + (d ? 'neg' : 'pos') + '">' + (d == null ? '–' : d === 0 ? '✓' : sgn(d)) + '</span></div>';
+      });
+      h += '</div>';
+      var tips = [];
+      /* principal */
+      if (g.main != null && a.main != null && g.main !== a.main) {
+        var ml = x.mainL, nb = g.main - (ml.skill || 0);
+        tips.push('<p class="small">Le jeu a compté <b>' + g.main + '</b> pour ' + esc(x.find.name) + ', l\'application <b>' + a.main + '</b>' + (ml.skill ? ' (note ' + ml.base0 + (ml.skill > 0 ? ' + ' : ' − ') + Math.abs(ml.skill) + ' de compétences)' : '') + (ml.est ? ' — sa note était <b>estimée</b>' : '') + '.</p><button class="btn small" data-act="cmp-main" data-ctx2="' + x.find.ctx + '" data-idx="' + x.find.idx + '" data-stat="' + x.stat + '" data-v="' + nb + '">Mettre sa note ' + (x.stat === 'atk' ? 'ATK' : 'DEF') + ' à ' + nb + (ml.skill ? ' (+ compétences = ' + g.main + ')' : '') + '</button>');
+      }
+      /* club */
+      if (g.club != null && g.club !== a.club) {
+        tips.push('<p class="small">Bonus Club : le jeu a ajouté <b>+' + g.club + '</b>, l\'application ' + (a.club == null ? 'n\'en avait pas' : 'avait <b>+' + a.club + '</b>') + '.</p><button class="btn small" data-act="cmp-club" data-ctx2="' + x.find.ctx + '" data-stat="' + x.stat + '" data-v="' + g.club + '">Mettre le bonus Club ' + (x.stat === 'atk' ? 'ATK' : 'DEF') + ' de « ' + team + ' » à ' + g.club + '</button>');
+      }
+      /* soutiens */
+      if (g.support != null && a.support != null && g.support !== a.support) {
+        var nsA = x.sups.length, okModes = Object.keys(x.modes).filter(function (md) { return x.modes[md] === g.support; });
+        var t = '<p class="small">Soutiens : le jeu a compté <b>+' + g.support + '</b>' + (x.nsGame != null ? ' pour ' + x.nsGame + ' cartes' : '') + ', l\'application <b>+' + a.support + '</b> pour ' + nsA + ' cartes.</p>';
+        if (x.nsGame != null && x.nsGame !== nsA) t += '<p class="small note warn">Le nombre de soutiens ne correspond pas : il manque ou il y a un joueur en trop dans « ' + team + ' ».</p>';
+        else if (okModes.length && okModes.indexOf((S.db.rules || {}).rounding || 'ceil') < 0) t += '<p class="small">Avec un arrondi ' + RL[okModes[0]] + ', le total des soutiens tombe juste.</p><button class="btn small" data-act="cmp-round" data-v="' + okModes[0] + '">Arrondir les soutiens ' + RL[okModes[0]] + '</button>';
+        else t += '<p class="small">Une ou plusieurs notes de soutien sont fausses. Notes utilisées (25 % de chaque, compétences comprises) :</p><ul class="cmpsup">' + x.sups.map(function (l) { return '<li><span>' + esc(l.name) + (l.est ? ' <i>estimée</i>' : '') + '</span><span>' + (l.base != null ? l.base : '?') + ' → +' + (l.contrib != null ? l.contrib : '?') + '</span></li>'; }).join('') + '</ul>';
+        tips.push(t);
+      }
+      if (!tips.length && gT != null && gT === aT) tips.push('<p class="small ok">Le calcul de l\'application est exact pour ce côté.</p>');
+      h += tips.join('') + '</div>';
+    });
+    return h + '</section>';
+  }
   function renderMatchResult(cur) {
     var h = '', att = cur.att == null ? 0 : cur.att, an = C.matchAnalysis(cur, att), defI = 1 - att;
     var complete = cur.sides.every(function (s) { return sideRowsCount(s) === 5; });
@@ -3806,6 +3892,7 @@ body { background-image: none; }
     h += '<section class="card"><b class="mt">Qui attaquait ?</b><div class="seg" role="group" aria-label="Qui attaquait ?">';
     [0, 1].forEach(function (i) { h += '<button class="segb' + (att === i ? ' on' : '') + '" data-act="match-att" data-i="' + i + '">' + (i === 0 ? 'Gauche' : 'Droite') + (cur.sides[i].name ? ' · ' + esc(cur.sides[i].name) : '') + '</button>'; });
     h += '</div></section>';
+    if (anyRows) h += renderMatchCompare(cur);
     if (anyRows) {
       h += '<section class="card"><b class="mt">Le détail, ligne par ligne</b><div class="mtab"><div class="mrow mhead"><span></span><span>Attaque</span><span>Défense</span><span>Écart</span></div>';
       an.rows.forEach(function (r) {
@@ -3986,14 +4073,6 @@ body { background-image: none; }
     if (m.unreadable) h += '<p class="note warn small">Nom difficile à lire sur la capture. Vérifiez-le.</p>';
     h += '<div class="chips">' + STATS.map(function (s) { return chip(s, e[s], e.src[s]); }).join('') + '</div>';
     var mr = e.rec;
-    if (m.rar && mr && mr.how === 'other') {
-      h += '<p class="note warn small"><b>' + esc(C.rarName(m.rar)) + '</b> : la base n\'a pas de note de cette rareté pour ' + esc(p ? p.name : m.name) + ' (elle a ' + mr.others.map(function (o) { return esc(C.rarName(o.rar) || 'rareté inconnue') + ' ' + (o.def != null ? fmt(o.def) : '?') + '/' + (o.atk != null ? fmt(o.atk) : '?'); }).join(', ') + ' en DEF/ATK). Ces notes d\'une autre rareté ne sont <b>pas</b> utilisées : importez la liste ' + esc(C.rarName(m.rar)) + ' ou saisissez les notes vues sur la carte.</p>';
-    } else if (m.rar && mr && mr.how === 'legacy') {
-      h += '<p class="note small">Note de la base sans rareté enregistrée : vérifiez qu\'elle correspond bien à ' + esc(C.rarName(m.rar)) + ' (réimportez la liste avec les étoiles pour l\'étiqueter).</p>';
-    }
-    h += '<div class="lbl">Rareté de la carte' + (m.rarAuto ? ' (lue sur le cadre, à vérifier)' : '') + '</div><div class="mactions rarrow">' + C.RARITIES.map(function (r) {
-      return '<button class="btn small' + (m.rar === r.key ? '' : ' ghost') + '" data-act="rar" data-key="' + m.key + '" data-rar="' + r.key + '"><i class="rdot r-' + r.key + '"></i>' + r.name + '</button>';
-    }).join('') + '</div>';
     STATS.forEach(function (s) {
       var fp = e.estInfo && e.estInfo[s]; if (!fp) return;
       var wp = fp.id ? S.db.players[fp.id] : null;
@@ -4533,11 +4612,6 @@ body { background-image: none; }
       (rep.unchanged ? '<span class="chip"><b>' + rep.unchanged + '</b> déjà à jour</span>' : '') +
       (rep.toconfirm ? '<span class="chip warnc"><b>' + rep.toconfirm + '</b> à confirmer</span>' : '') +
       (rep.skipped ? '<span class="chip"><b>' + rep.skipped + '</b> ignorés</span>' : '') + '</div>';
-    var rarCount = {}, rarNone = 0;
-    jobRows(job).forEach(function (r) { if (r.rar) rarCount[r.rar] = (rarCount[r.rar] || 0) + 1; else rarNone++; });
-    h += '<div class="rarjob"><div class="lbl">Rareté des joueurs de ce fichier</div><div class="mactions rarrow"><button class="btn small' + (job.rar ? ' ghost' : '') + '" data-act="job-rar" data-job="' + job.id + '" data-rar="">Lue dans le fichier</button>' +
-      C.RARITIES.map(function (r) { return '<button class="btn small' + (job.rar === r.key ? '' : ' ghost') + '" data-act="job-rar" data-job="' + job.id + '" data-rar="' + r.key + '"><i class="rdot r-' + r.key + '"></i>' + r.name + '</button>'; }).join('') + '</div>' +
-      '<p class="muted small">' + (Object.keys(rarCount).length ? 'Lu : ' + C.RARITIES.filter(function (r) { return rarCount[r.key]; }).map(function (r) { return rarCount[r.key] + ' ' + r.name; }).join(', ') + (rarNone ? ' · ' + rarNone + ' sans rareté' : '') + '.' : 'Aucune rareté lue dans ce fichier : choisissez-la ci-dessus, sinon les notes seront enregistrées sans rareté (comme avant).') + (Object.keys(rarCount).some(function (k) { return k !== 'legendary' && k !== 'goat'; }) ? ' Star, Pro et Common se ressemblent : vérifiez la liste.' : '') + '</p></div>';
     var nStatRows = { def: 0, atk: 0 };
     job.rows.forEach(function (r) { STATS.forEach(function (s) { if (r[s] != null) nStatRows[s]++; }); });
     h += '<p class="muted small">' + job.rows.length + ' lignes lues · DEF : ' + nStatRows.def + ' · ATK : ' + nStatRows.atk + '. Les statistiques absentes du fichier restent vides.</p>';
@@ -4575,6 +4649,7 @@ body { background-image: none; }
     return h + '</article>';
   }
   function rarBadge(k) {
+    return ''; /* raretés retirées */
     if (!k) return '';
     return ' <span class="rarbadge"><i class="rdot r-' + k + '"></i>' + esc(C.rarName(k)) + '</span>';
   }
@@ -4603,7 +4678,7 @@ body { background-image: none; }
     var tagged = {};
     Object.keys(S.db.players).forEach(function (id) { var q = S.db.players[id]; if (q.rar) tagged[C.nameKey(q.name)] = 1; });
     h += '<ul class="plist">' + list.slice(0, S.limit).map(function (p) {
-      return '<li><button class="prow" data-act="edit-player" data-id="' + esc(p.id) + '"><span class="pn"><b>' + esc(p.name) + '</b>' + (!p.rar && tagged[C.nameKey(p.name)] ? ' <span class="rarbadge">rareté à indiquer</span>' : rarBadge(p.rar)) + '<small>' + [p.pos, p.club].filter(Boolean).map(esc).join(' · ') + '</small></span><span class="chips tiny">' + playerChips(p) + '</span></button></li>';
+      return '<li><button class="prow" data-act="edit-player" data-id="' + esc(p.id) + '"><span class="pn"><b>' + esc(p.name) + '</b>' + '' + '<small>' + [p.pos, p.club].filter(Boolean).map(esc).join(' · ') + '</small></span><span class="chips tiny">' + playerChips(p) + '</span></button></li>';
     }).join('') + '</ul>';
     if (list.length > S.limit) h += '<button class="btn" data-act="more-players">Afficher plus (' + (list.length - S.limit) + ' restants)</button>';
     return h;
@@ -4826,7 +4901,6 @@ body { background-image: none; }
       h += '<h2>' + (m.isNew ? 'Nouveau joueur' : 'Fiche du joueur') + '</h2>';
       h += '<label class="field"><span>Nom</span><input id="e-name" type="text" value="' + esc(p.name) + '" autocomplete="off"></label>';
       h += '<div class="grid2"><label class="field"><span>Position</span><input id="e-pos" type="text" value="' + esc(p.pos || '') + '"></label><label class="field"><span>Club</span><input id="e-club" type="text" value="' + esc(p.club || '') + '"></label></div>';
-      h += '<label class="field"><span>Rareté de ces notes</span><select id="e-rar"><option value="">Inconnue (ancienne fiche)</option>' + C.RARITIES.map(function (r) { return '<option value="' + r.key + '"' + (p.rar === r.key ? ' selected' : '') + '>' + r.name + '</option>'; }).join('') + '</select></label>';
       h += '<div class="grid2"><label class="field"><span>DEF</span><input id="e-def" type="text" inputmode="decimal" value="' + (p.def == null ? '' : esc(p.def)) + '" placeholder="inconnue"></label><label class="field"><span>ATK</span><input id="e-atk" type="text" inputmode="decimal" value="' + (p.atk == null ? '' : esc(p.atk)) + '" placeholder="inconnue"></label></div>';
       h += '<p class="muted small">Laissez vide si la statistique est inconnue : elle pourra être complétée plus tard par un import.</p>';
       if (p.src && (p.src.def || p.src.atk)) h += '<p class="muted small">Sources : ' + [p.src.def ? 'DEF ← ' + esc(p.src.def) : '', p.src.atk ? 'ATK ← ' + esc(p.src.atk) : ''].filter(Boolean).join(' · ') + '</p>';
@@ -4972,7 +5046,6 @@ body { background-image: none; }
         if (S.sheet) {
           var sh = S.sheet; sh.name = (($('#sh-name') || {}).value || '').trim(); sh.def = numOrNull(($('#sh-def') || {}).value); sh.atk = numOrNull(($('#sh-atk') || {}).value); sh.pos = ($('#sh-pos') || {}).value || null;
           if (!sh.name) { toast('Entrez le nom du joueur'); break; }
-          if (!sh.rar) { toast('Choisissez la rareté de la carte'); break; }
           if (sh.def == null && sh.atk == null) { toast('Entrez au moins la DEF ou l\'ATK'); break; }
           sheetSave(sh); renderTab();
         }
@@ -5000,6 +5073,20 @@ body { background-image: none; }
         renderTab(); toast('Analyse supprimée'); break;
       case 'face-on': case 'face-off': case 'lock-ui': case 'lock-now': case 'lock-save': case 'lock-change': case 'lock-remove': lockAct(act, d); break;
       case 'match-stop': if (M().ctl) M().ctl.abort(); break;
+      case 'cmp-club': {
+        var cv = String(d.v), ck = d.stat === 'atk' ? 'clubAtk' : 'clubDef';
+        if (d.ctx2 === 'mine') { inMine(function () { S.bonus[ck] = cv; }); saveMine(); } else { S.bonus[ck] = cv; saveOppSoon(); }
+        renderTab(); toast('Bonus Club corrigé'); break;
+      }
+      case 'cmp-round': S.db.rules = Object.assign({}, S.db.rules, { rounding: d.v }); persist({ rules: true }); renderTab(); toast('Arrondi des soutiens changé'); break;
+      case 'cmp-main': {
+        var tm = d.ctx2 === 'mine' ? S.mine.team : S.team, mm = tm.members[+d.idx], rec = mm ? memberRec(mm).p : null, nv = +d.v, st = d.stat;
+        if (rec) {
+          if (!rec.hist) rec.hist = []; if (!rec.src) rec.src = {};
+          if (rec[st] !== nv) { rec.hist.push({ stat: st, old: rec[st], now: nv, date: new Date().toISOString(), src: 'résultat de match' }); rec[st] = nv; rec.src[st] = 'résultat de match'; rec.updated = new Date().toISOString(); var cs2 = {}; cs2[chunkOf(rec.id)] = 1; persist({ chunks: cs2 }); }
+        } else if (mm) { mm.seen = mm.seen || {}; mm.seen[st] = nv; mm.useSeen = mm.useSeen || {}; mm.useSeen[st] = true; if (d.ctx2 === 'mine') saveMine(); else saveOppSoon(); }
+        renderTab(); toast('Note corrigée'); break;
+      }
       case 'match-att': if (M().cur) { M().cur.att = +d.i; M().cur.attHow = 'manual'; matchRecord(); } renderTab(); break;
       case 'match-hist-clear': M().confirm = true; renderTab(); break;
       case 'match-hist-no': M().confirm = false; renderTab(); break;
@@ -5100,7 +5187,7 @@ body { background-image: none; }
       if (def != null) p.src.def = 'saisie manuelle'; if (atk != null) p.src.atk = 'saisie manuelle';
       p.created = date;
     }
-    var rv = ($('#e-rar') || {}).value || ''; if (rv) p.rar = rv; else delete p.rar;
+    delete p.rar;
     p.name = name; p.pos = $('#e-pos').value.trim() || null; p.club = $('#e-club').value.trim() || null; p.def = def; p.atk = atk; p.updated = date;
     S.db.players[p.id] = p;
     var cs = {}; cs[chunkOf(p.id)] = 1; persist({ chunks: cs });
@@ -5144,6 +5231,45 @@ body { background-image: none; }
   }
 
   /* ---------- Démarrage ---------- */
+
+  /* Raretés retirées : on enlève l'étiquette de rareté et on regroupe les fiches qu'elle avait séparées (même nom, même club ou club inconnu).
+     La fiche la plus récente est gardée ; les notes différentes des autres restent visibles dans son historique. */
+  function dropRarity() {
+    var P = S.db.players, ids = Object.keys(P), had = {}, groups = {}, cs = {}, remap = {}, n = 0, merged = 0, now = new Date().toISOString();
+    var compat = C.clubCompat || function (a, b) { var x = C.normText(a || ''), y = C.normText(b || ''); return !x || !y || x === y; };
+    ids.forEach(function (id) { var p = P[id]; if (p && 'rar' in p) { if (p.rar) had[id] = 1; delete p.rar; cs[chunkOf(id)] = 1; n++; } });
+    if (n) {
+      ids.forEach(function (id) { var k = C.nameKey(P[id].name || ''); if (k) (groups[k] = groups[k] || []).push(id); });
+      Object.keys(groups).forEach(function (k) {
+        var left = groups[k].slice();
+        if (left.length < 2 || !left.some(function (id) { return had[id]; })) return;
+        while (left.length) {
+          var head = left.shift(), cl = [head];
+          left = left.filter(function (id) { if (compat(P[head].club, P[id].club)) { cl.push(id); return false; } return true; });
+          if (cl.length < 2 || !cl.some(function (id) { return had[id]; })) continue;
+          cl.sort(function (a, b) { return String(P[b].updated || P[b].created || '').localeCompare(String(P[a].updated || P[a].created || '')); });
+          var keep = P[cl[0]]; keep.hist = keep.hist || []; keep.src = keep.src || {};
+          cl.slice(1).forEach(function (id) {
+            var o = P[id];
+            STATS.forEach(function (s) {
+              if (keep[s] == null && o[s] != null) { keep[s] = o[s]; keep.src[s] = (o.src && o.src[s]) || ''; }
+              else if (o[s] != null && o[s] !== keep[s]) keep.hist.push({ stat: s, old: o[s], now: keep[s], date: now, src: 'fiches regroupées (raretés retirées)' });
+            });
+            if (!keep.pos && o.pos) keep.pos = o.pos; if (!keep.club && o.club) keep.club = o.club;
+            remap[id] = keep.id; cs[chunkOf(id)] = 1; delete P[id]; merged++;
+          });
+          cs[chunkOf(keep.id)] = 1;
+        }
+      });
+    }
+    var memb = 0;
+    [S.team && S.team.members, S.mine && S.mine.team && S.mine.team.members].forEach(function (list) {
+      (list || []).forEach(function (m) { if (m.id && remap[m.id]) { m.id = remap[m.id]; memb++; } if ('rar' in m || 'rarAuto' in m) { delete m.rar; delete m.rarAuto; memb++; } });
+    });
+    if (n) persist({ chunks: cs });
+    if (memb) { saveMine(); saveOpp(); }
+    return { tagged: n, merged: merged };
+  }
   function boot() {
     lockScreen();
     document.addEventListener('click', onClick);
@@ -5152,9 +5278,9 @@ body { background-image: none; }
     document.addEventListener('input', onInput);
     document.addEventListener('change', onChange);
     renderTab();
-    initStorage().then(function () { return loadMine(); }).then(function () { return loadOpp(); }).then(function () { S.ready = true; renderTab(); }).catch(function () { S.ready = true; renderTab(); });
+    initStorage().then(function () { return loadMine(); }).then(function () { return loadOpp(); }).then(function () { S.ready = true; try { dropRarity(); } catch (e) { /* ignore */ } renderTab(); }).catch(function () { S.ready = true; renderTab(); });
   }
-  window.SnatchApp = { skMask: skMask, readCardTag: readCardTag, fondThumb: fondThumb, fondFeatures: fondFeatures, fondPredict: fondPredict, readCardFond: readCardFond, nameCanvas: nameCanvas, ocrText: ocrText, readCardSkills: readCardSkills, skSlots: skSlots, findCardStrips: findCardStrips, findProfileCards: findProfileCards, findCardsByNames: findCardsByNames, completeGrid: completeGrid, tagCanvas: tagCanvas, bitmapCanvas: bitmapCanvas, S: S, C: C, startImport: startImport, saveJob: saveJob, jobReport: jobReport, renderTab: renderTab, analyseScreenshot: analyseScreenshot, teamCalc: teamCalc, effStats: effStats, boot: boot };
+  window.SnatchApp = { skMask: skMask, readCardTag: readCardTag, fondThumb: fondThumb, fondFeatures: fondFeatures, fondPredict: fondPredict, readCardFond: readCardFond, nameCanvas: nameCanvas, ocrText: ocrText, readCardSkills: readCardSkills, skSlots: skSlots, findCardStrips: findCardStrips, findProfileCards: findProfileCards, findCardsByNames: findCardsByNames, completeGrid: completeGrid, tagCanvas: tagCanvas, bitmapCanvas: bitmapCanvas, S: S, C: C, dropRarity: dropRarity, startImport: startImport, saveJob: saveJob, jobReport: jobReport, renderTab: renderTab, analyseScreenshot: analyseScreenshot, teamCalc: teamCalc, effStats: effStats, boot: boot };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
 
