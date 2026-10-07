@@ -523,6 +523,23 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
 .lockface { min-height: 50px; border: 1.5px solid rgba(190,255,225,.28); border-radius: 16px; background: rgba(255,255,255,.08); color: #fff; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px; }
 .lockface svg { width: 26px; height: 26px; }
 
+/* Écran d'entrée épuré : le GIF reste visible, seulement le champ du mot de passe */
+#lock { align-items: center; padding: 24px 28px calc(22vh + env(safe-area-inset-bottom, 0px)); }
+#lock::before { display: none; }
+.lockbox { background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; padding: 0; gap: 18px; max-width: 320px; }
+.lockbox.ok { box-shadow: none; transform: none; opacity: 0; transition: opacity .25s; }
+.lockbox input { background: rgba(0,0,0,.18); border: 1.5px solid rgba(255,255,255,.55); }
+.lockbox input:focus { border-color: #fff; box-shadow: none; }
+.lockbox summary, .lockbox input::placeholder { text-shadow: 0 1px 6px rgba(0,0,0,.9); }
+.lockbox summary { color: rgba(255,255,255,.75); }
+.lockbox details[open] { background: rgba(0,0,0,.7); border-radius: 14px; padding: 12px; }
+.lockface { background: rgba(0,0,0,.18); border-color: rgba(255,255,255,.55); }
+.lockbox details { text-align: center; }
+.lockbox summary { display: block; list-style: none; }
+.lockbox summary::-webkit-details-marker { display: none; }
+#lock .lockbox details, #lock .lockbox summary { text-align: center !important; width: 100%; }
+#lock .lockbox details > summary { display: flex; justify-content: center; }
+
 </style></head><body>
 <header class="top"><div class="brand">Mon <span>calculateur</span></div><div id="status" class="status" role="status"></div><button class="gear" data-tab="settings" aria-label="Réglages"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h9m4 0h1M5 17h3m4 0h7M5 12h1m4 0h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button></header>
 <main id="view"></main>
@@ -1936,7 +1953,7 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
   /* ----- Mode serveur (application hors de Claude) : base et lecture d'images passent par le serveur ----- */
   var SERVER = !!window.SNATCH_SERVER;
   /* Mode « local » : tout reste sur l'appareil (base IndexedDB), lecture des images par OCR gratuit sur l'appareil. Aucun serveur, aucune API payante. */
-  var BUILD = '07/10 02:17';
+  var BUILD = '07/10 02:25';
   /* Blocs repliables (Nouveautés, exemple de capture) : le choix est gardé sur l'appareil */
   function uiGet(key, def) {
     try { var o = JSON.parse(localStorage.getItem('snatch.ui') || '{}'); if (o && typeof o[key] === 'boolean') return o[key]; } catch (e) { /* ignore */ }
@@ -4653,9 +4670,8 @@ details.crit > summary { display: flex; flex-direction: column; gap: 2px; }
     document.documentElement.classList.add('locked');
     var el = document.getElementById('lock');
     if (!el) { el = document.createElement('div'); el.id = 'lock'; document.body.appendChild(el); }
-    el.innerHTML = '<div class="lockbox"><div class="lockicon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="9.5" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>' +
-      '<h1><span>Mon</span> calculateur</h1><p class="lockhint">Tapez votre mot de passe : l\'application s\'ouvre dès qu\'il est bon.</p>' +
-      (faceGet() && faceSupported() ? '<button type="button" id="lock-face" class="lockface">' + FACE_SVG + 'Ouvrir avec Face ID</button>' : '') + '<form id="lock-form" autocomplete="off"><input id="lock-pw" type="password" autocomplete="current-password" placeholder="Mot de passe" aria-label="Mot de passe"><button class="lockgo" type="submit">Ouvrir</button></form>' +
+    el.innerHTML = '<div class="lockbox">' +
+      (faceGet() && faceSupported() ? '<button type="button" id="lock-face" class="lockface">' + FACE_SVG + 'Ouvrir avec Face ID</button>' : '') + '<form id="lock-form" autocomplete="off"><input id="lock-pw" type="password" autocomplete="current-password" placeholder="Mot de passe" aria-label="Mot de passe"></form>' +
       '<p id="lock-msg" class="lockmsg" hidden></p>' +
       '<details class="more"><summary>Mot de passe oublié ?</summary><p class="small">Le mot de passe n\'est connu que de cet appareil : personne, moi compris, ne peut le retrouver. Vous pouvez seulement réinitialiser l\'application, ce qui <b>efface toutes les données de cet appareil</b> (joueurs, équipes, analyses). Si vous avez une sauvegarde, vous pourrez la restaurer ensuite.</p><button class="btn danger small" id="lock-reset" type="button">Réinitialiser l\'application…</button></details></div>';
     var form = document.getElementById('lock-form'), msg = document.getElementById('lock-msg');
